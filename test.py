@@ -1,13 +1,25 @@
+from typing import List, Tuple, Union
 import wx
+import wx.adv
+import psycopg2 as pspg2
+import matplotlib.pyplot as plt
+import numpy as np
 
-BEARING_LIST = ['Первый подшипник', 'Второй подшипник', 'Третий подшипник']
+BEARING_LIST: List[str] = ['Первый подшипник',
+                           'Второй подшипник',
+                           'Третий подшипник']
+BACKGROUND_COLOR: str = '#fff1e6'
+BUTTON_COLOR: str = '#1e7b7b'
+TEXT_COLOR: str = '#000000'
 
 
 class AuthorizationWindow(wx.Frame):
-    def __init__(self, parent):
-        super().__init__(parent,
+    def __init__(self):
+        super().__init__(parent=None,
                          title='Вход в систему',
-                         size=(270, 170))
+                         size=(270, 170),
+                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
+                         | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
@@ -15,7 +27,155 @@ class AuthorizationWindow(wx.Frame):
 
         panel = wx.Panel(self)
         panel.SetFont(font)
-        panel.SetBackgroundColour('#eea588')
+        panel.SetBackgroundColour(BACKGROUND_COLOR)
+
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
+
+        login_label = wx.StaticText(panel, label='Логин')
+        login_label.SetForegroundColour(TEXT_COLOR)
+        self.login_edit = wx.TextCtrl(panel,
+                                      size=(170, 30))
+
+        password_label = wx.StaticText(panel, label='Пароль')
+        password_label.SetForegroundColour(TEXT_COLOR)
+        self.password_edit = wx.TextCtrl(panel,
+                                         size=(170, 30),
+                                         style=wx.TE_PASSWORD)
+
+        flex_grid_sizer.AddMany([(login_label),
+                                 (self.login_edit, wx.ID_ANY, wx.EXPAND),
+                                 (password_label),
+                                 (self.password_edit, wx.ID_ANY, wx.EXPAND)])
+
+        box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
+
+        enter_button = wx.Button(panel, label='Войти')
+        enter_button.SetForegroundColour(TEXT_COLOR)
+        enter_button.SetBackgroundColour(BUTTON_COLOR)
+
+        box_sizer.Add(enter_button,
+                      flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
+        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
+
+        panel.SetSizer(box_sizer)
+
+        self.Bind(wx.EVT_CLOSE, self.on_close_window)
+
+    def on_close_window(self, event):
+        question: str = 'Вы действительно хотите выйти из приложения?'
+        dialog_message = wx.MessageDialog(self,
+                                          question,
+                                          ' ',
+                                          wx.YES_NO | wx.YES_DEFAULT
+                                          | wx.ICON_WARNING)  # INFORMATION, ERROR
+        result: int = dialog_message.ShowModal()
+        if result == wx.ID_YES:
+            self.Destroy()
+        else:
+            event.Veto()
+
+    def get_connection(self, username: str, password: str):
+        connection_string: str = \
+            f'dbname=testdb user={username} password={password}'
+        try:
+            connection: Union[pspg2.extensions.connection,
+                              None] = pspg2.connect(connection_string)
+        except pspg2.OperationalError:
+            error_text: str = 'Введен неверный логин или пароль'
+            dialog_message = wx.MessageDialog(self,
+                                              error_text,
+                                              ' ',
+                                              wx.OK | wx.ICON_ERROR)
+            dialog_message.ShowModal()
+            return None
+        else:
+            dialog_message = wx.MessageDialog(self,
+                                              'Вход успешен',
+                                              ' ',
+                                              wx.OK
+                                              | wx.ICON_INFORMATION)
+            dialog_message.ShowModal()
+            return connection
+
+    def on_enter_button_click(self, event):
+        login: str = self.login_edit.GetValue()
+        password: str = self.password_edit.GetValue()
+        connection = self.get_connection(login, password)
+        if connection:
+            self.Destroy()
+            main_frame = MainWindow(db_connection=connection)
+            main_frame.Show()
+
+
+class SelectDataWindow(wx.Dialog):
+    def __init__(self, parent):
+        super().__init__(parent=parent,
+                         title='Выбрать дату прогноза',
+                         size=(300, 170),
+                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
+                         | wx.CAPTION | wx.CLOSE_BOX)
+        self.Center()
+
+        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        font.SetPointSize(12)
+
+        panel = wx.Panel(self)
+        panel.SetFont(font)
+        panel.SetBackgroundColour(BACKGROUND_COLOR)
+
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        flex_grid_sizer = wx.FlexGridSizer(2, 3, 10, 10)
+
+        date_begin_label = wx.StaticText(panel, label='C')
+        date_begin_edit = wx.adv.DatePickerCtrl(panel,
+                                                style=wx.adv.DP_DROPDOWN,
+                                                size=(130, 30))
+        time_begin_edit = wx.adv.TimePickerCtrl(panel,
+                                                size=(100, 30))
+
+        date_end_label = wx.StaticText(panel, label='По')
+        date_end_edit = wx.adv.DatePickerCtrl(panel,
+                                              style=wx.adv.DP_DROPDOWN,
+                                              size=(130, 30))
+        time_end_edit = wx.adv.TimePickerCtrl(panel,
+                                              size=(100, 30))
+
+        flex_grid_sizer.AddMany([(date_begin_label),
+                                 (date_begin_edit, wx.ID_ANY, wx.EXPAND),
+                                 (time_begin_edit, wx.ID_ANY, wx.EXPAND),
+                                 (date_end_label),
+                                 (date_end_edit, wx.ID_ANY, wx.EXPAND),
+                                 (time_end_edit, wx.ID_ANY, wx.EXPAND)])
+
+        box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
+
+        enter_button = wx.Button(panel, label='Спрогнозировать')
+        enter_button.SetForegroundColour(TEXT_COLOR)
+        enter_button.SetBackgroundColour(BUTTON_COLOR)
+        box_sizer.Add(enter_button,
+                      flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
+
+        panel.SetSizer(box_sizer)
+
+
+class PlotWindow(wx.Frame):
+    def __init__(self, parent):
+        super().__init__(parent,
+                         title='Визуализация',
+                         size=(270, 170),
+                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
+                         | wx.CAPTION | wx.CLOSE_BOX)
+        self.Center()
+
+        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        font.SetPointSize(12)
+
+        panel = wx.Panel(self)
+        panel.SetFont(font)
+        panel.SetBackgroundColour(BACKGROUND_COLOR)
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -25,7 +185,9 @@ class AuthorizationWindow(wx.Frame):
         login_edit = wx.TextCtrl(panel, size=(170, 30))
 
         password_label = wx.StaticText(panel, label='Пароль')
-        password_edit = wx.TextCtrl(panel, size=(170, 30))
+        password_edit = wx.TextCtrl(panel,
+                                    size=(170, 30),
+                                    style=wx.TE_PASSWORD)
 
         flex_grid_sizer.AddMany([(login_label),
                                  (login_edit, wx.ID_ANY, wx.EXPAND),
@@ -37,74 +199,45 @@ class AuthorizationWindow(wx.Frame):
         enter_button = wx.Button(panel, label='Войти')
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
+        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
 
         panel.SetSizer(box_sizer)
 
-
-class SelectDataWindow(wx.Frame):
-    def __init__(self, parent):
-        super().__init__(parent=parent,
-                         title='Выбрать дату прогноза',
-                         size=(320, 170))
-        self.Center()
-
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(12)
-
-        panel = wx.Panel(self)
-        panel.SetFont(font)
-        panel.SetBackgroundColour('#ee0588')
-
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
-
-        date_begin_label = wx.StaticText(panel, label='C')
-        date_begin_edit = wx.TextCtrl(panel, size=(260, 30))
-
-        date_end_label = wx.StaticText(panel, label='По')
-        date_end_edit = wx.TextCtrl(panel, size=(260, 30))
-
-        flex_grid_sizer.AddMany([(date_begin_label),
-                                 (date_begin_edit, wx.ID_ANY, wx.EXPAND),
-                                 (date_end_label),
-                                 (date_end_edit, wx.ID_ANY, wx.EXPAND)])
-
-        box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
-
-        enter_button = wx.Button(panel, label='Спрогнозировать')
-        box_sizer.Add(enter_button,
-                      flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
-
-        panel.SetSizer(box_sizer)
+        self.Bind(wx.EVT_CLOSE, self.on_close_window)
 
 
-class SendMessageWindow(wx.Frame):
+class SendMessageWindow(wx.Dialog):
     def __init__(self, parent):
         super().__init__(parent=parent,
                          title='Отправка сообщения',
-                         size=(310, 170))
+                         size=(290, 170),
+                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
+                         | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetPointSize(12)
 
         panel = wx.Panel(self)
+
         panel.SetFont(font)
-        panel.SetBackgroundColour('#ee8588')
+        panel.SetBackgroundColour(BACKGROUND_COLOR)
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
 
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
         change_bearing_label = wx.StaticText(panel, label='Заменить')
-        change_bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
+        self.bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
+        self.bearing_choice.SetSelection(0)
 
         date_label = wx.StaticText(panel, label='До')
-        date_edit = wx.TextCtrl(panel, size=(260, 30))
+        date_edit = wx.adv.DatePickerCtrl(panel,
+                                          style=wx.adv.DP_DROPDOWN,
+                                          size=(130, 30))
 
         flex_grid_sizer.AddMany([(change_bearing_label),
-                                 (change_bearing_choice,
+                                 (self.bearing_choice,
                                   wx.ID_ANY, wx.EXPAND),
                                  (date_label),
                                  (date_edit, wx.ID_ANY, wx.EXPAND)])
@@ -112,6 +245,8 @@ class SendMessageWindow(wx.Frame):
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
         enter_button = wx.Button(panel, label='Отправить')
+        enter_button.SetForegroundColour(TEXT_COLOR)
+        enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
 
@@ -119,10 +254,12 @@ class SendMessageWindow(wx.Frame):
 
 
 class MainWindow(wx.Frame):
-    def __init__(self, parent):
-        super().__init__(parent=parent,
+    def __init__(self, db_connection):
+        super().__init__(parent=None,
                          title='Основное окно',
-                         size=(310, 240))
+                         size=(310, 240),
+                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
+                         | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
@@ -130,33 +267,46 @@ class MainWindow(wx.Frame):
 
         panel = wx.Panel(self)
         panel.SetFont(font)
-        panel.SetBackgroundColour('#ee9998')
+        panel.SetBackgroundColour(BACKGROUND_COLOR)
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        change_bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
-        box_sizer.Add(change_bearing_choice,
+        self.bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
+        self.bearing_choice.SetSelection(0)
+        box_sizer.Add(self.bearing_choice,
                       flag=wx.EXPAND | wx.ALL, border=10)
 
         select_button = wx.Button(panel, label='Выбрать дату прогноза')
+        select_button.SetForegroundColour(TEXT_COLOR)
+        select_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(select_button,
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
+        select_button.Bind(wx.EVT_BUTTON, self.on_select_button_click)
 
         visualization_button = wx.Button(panel, label='Визуализация процесса')
+        visualization_button.SetForegroundColour(TEXT_COLOR)
+        visualization_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(visualization_button,
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
+        visualization_button.Bind(wx.EVT_BUTTON, self.visualize)
 
         send_message_button = wx.Button(panel, label='Отправить сообщение')
+        send_message_button.SetForegroundColour(TEXT_COLOR)
+        send_message_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(send_message_button,
                       flag=wx.EXPAND
                       | wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
+        send_message_button.Bind(
+            wx.EVT_BUTTON, self.on_send_message_button_click)
 
         save_prediction_button = wx.Button(panel, label='Записать прогноз')
+        save_prediction_button.SetForegroundColour(TEXT_COLOR)
+        save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(save_prediction_button,
                       flag=wx.EXPAND
                       | wx.LEFT | wx.RIGHT | wx.BOTTOM,
@@ -164,19 +314,62 @@ class MainWindow(wx.Frame):
 
         panel.SetSizer(box_sizer)
 
+        self.Bind(wx.EVT_CLOSE, self.on_close_window)
+
+    def on_close_window(self, event):
+        question: str = 'Вы действительно хотите выйти из приложения?'
+        dialog_message = wx.MessageDialog(self,
+                                          question,
+                                          ' ',
+                                          wx.YES_NO | wx.YES_DEFAULT
+                                          | wx.ICON_WARNING)
+        result = dialog_message.ShowModal()
+
+        if result == wx.ID_YES:
+            self.Destroy()
+        else:
+            event.Veto()
+
+    def on_select_button_click(self, event):
+        with SelectDataWindow(self) as select_data_dialog:
+            select_data_dialog.ShowModal()
+
+    def prediction_intervals(y_r: np.ndarray, percent: int = 0.97) -> Tuple[
+            np.ndarray, np.ndarray]:
+        '''Prediction interval'''
+        std = y_r.std()
+        if percent == 0.97:
+            koef = 2.1701
+        elif percent == 0.975:
+            koef = 2.2414
+        elif percent == 0.98:
+            koef = 2.3153
+        elif percent == 0.985:
+            koef = 2.4324
+        elif percent == 0.99:
+            koef = 2.5758
+        elif percent == 0.995:
+            koef = 2.807
+        yr_min = y_r - round(koef * std, 8)
+        yr_max = y_r + round(koef * std, 8)
+        return yr_min, yr_max
+
+    def visualize(self, event) -> None:
+        plt.grid(axis='y')
+        plt.show()
+        self.SetSize(wx.Size((310, 240)))
+
+    def on_send_message_button_click(self, event):
+        with SendMessageWindow(self) as send_message_dialog:
+            send_message_dialog.ShowModal()
+
 
 app = wx.App()
 
-# authorization_frame = AuthorizationWindow(None)
+# authorization_frame = AuthorizationWindow()
 # authorization_frame.Show()
 
-# select_frame = SelectDataWindow(None)
-# select_frame.Show()
-
-# send_message_frame = SendMessageWindow(None)
-# send_message_frame.Show()
-
-main_frame = MainWindow(None)
+main_frame = MainWindow()
 main_frame.Show()
 
 app.MainLoop()
