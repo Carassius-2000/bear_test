@@ -1,3 +1,4 @@
+"""Bearing Vibration Prediction Information System"""
 from typing import List, Tuple, Union
 import wx
 import wx.adv
@@ -15,23 +16,30 @@ TEXT_COLOR: str = '#000000'
 
 
 class AuthorizationWindow(wx.Frame):
+    """Window that allows you to enter Information System."""
+
     def __init__(self):
+        """Create Authorization Window.
+
+        Attributes:
+            login_edit: Edit that contains user's login.
+            password_edit: Edit that contains user's password.
+        """
         super().__init__(parent=None,
                          title='Вход в систему',
                          size=(270, 170),
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
-
+        # get OS default font
         font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
         font.SetPointSize(12)
 
         panel = wx.Panel(self)
         panel.SetFont(font)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
-
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
-
+        # create FlexGridSizer that contains login and password edits
+        # with their respective labels
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
         login_label = wx.StaticText(panel, label='Логин')
@@ -49,13 +57,13 @@ class AuthorizationWindow(wx.Frame):
                                  (self.login_edit, wx.ID_ANY, wx.EXPAND),
                                  (password_label),
                                  (self.password_edit, wx.ID_ANY, wx.EXPAND)])
-
+        # add FlexGridSizer to BoxSizer
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
         enter_button = wx.Button(panel, label='Войти')
         enter_button.SetForegroundColour(TEXT_COLOR)
         enter_button.SetBackgroundColour(BUTTON_COLOR)
-
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
         enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
@@ -65,6 +73,7 @@ class AuthorizationWindow(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
 
     def on_close_window(self, event) -> None:
+        """Close Authorization Window."""
         question: str = 'Вы действительно хотите выйти из приложения?'
         dialog_message = wx.MessageDialog(self,
                                           question,
@@ -78,6 +87,18 @@ class AuthorizationWindow(wx.Frame):
             event.Veto()
 
     def get_connection(self, username: str, password: str):
+        """Get PostgreSQL database connection.
+
+        Args:
+            username (str): PostgreSQL user's name.
+            password (str): PostgreSQL user's password.
+
+        Returns:
+            PostgreSQL connection.
+
+        Raises:
+            psycopg2.OperationalError: If username or password is invalid.
+        """
         connection_string: str = \
             f'dbname=testdb user={username} password={password}'
         try:
@@ -94,7 +115,8 @@ class AuthorizationWindow(wx.Frame):
         else:
             return connection
 
-    def on_enter_button_click(self, event):
+    def on_enter_button_click(self, event) -> None:
+        """Enter Information System."""
         login: str = self.login_edit.GetValue()
         password: str = self.password_edit.GetValue()
         connection = self.get_connection(login, password)
@@ -120,8 +142,6 @@ class SelectDataWindow(wx.Dialog):
         panel.SetFont(font)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
 
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
-
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
         date_begin_label = wx.StaticText(panel, label='C')
@@ -139,6 +159,7 @@ class SelectDataWindow(wx.Dialog):
                                  (date_end_label),
                                  (date_end_edit, wx.ID_ANY, wx.EXPAND)])
 
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
         enter_button = wx.Button(panel, label='Спрогнозировать')
@@ -208,11 +229,8 @@ class SendMessageWindow(wx.Dialog):
         font.SetPointSize(12)
 
         panel = wx.Panel(self)
-
         panel.SetFont(font)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
-
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
 
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
@@ -231,6 +249,7 @@ class SendMessageWindow(wx.Dialog):
                                  (date_label),
                                  (self.date_edit, wx.ID_ANY, wx.EXPAND)])
 
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
         enter_button = wx.Button(panel, label='Отправить')
