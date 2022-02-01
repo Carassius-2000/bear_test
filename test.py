@@ -4,12 +4,13 @@ import wx.adv
 import psycopg2 as pspg2
 import matplotlib.pyplot as plt
 import numpy as np
+import telegram
 
 BEARING_LIST: List[str] = ['Первый подшипник',
                            'Второй подшипник',
                            'Третий подшипник']
 BACKGROUND_COLOR: str = '#fff1e6'
-BUTTON_COLOR: str = '#1e7b7b'
+BUTTON_COLOR: str = '#1bc163'
 TEXT_COLOR: str = '#000000'
 
 
@@ -63,13 +64,13 @@ class AuthorizationWindow(wx.Frame):
 
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
 
-    def on_close_window(self, event):
+    def on_close_window(self, event) -> None:
         question: str = 'Вы действительно хотите выйти из приложения?'
         dialog_message = wx.MessageDialog(self,
                                           question,
                                           ' ',
                                           wx.YES_NO | wx.YES_DEFAULT
-                                          | wx.ICON_WARNING)  # INFORMATION, ERROR
+                                          | wx.ICON_WARNING)
         result: int = dialog_message.ShowModal()
         if result == wx.ID_YES:
             self.Destroy()
@@ -91,12 +92,6 @@ class AuthorizationWindow(wx.Frame):
             dialog_message.ShowModal()
             return None
         else:
-            dialog_message = wx.MessageDialog(self,
-                                              'Вход успешен',
-                                              ' ',
-                                              wx.OK
-                                              | wx.ICON_INFORMATION)
-            dialog_message.ShowModal()
             return connection
 
     def on_enter_button_click(self, event):
@@ -127,28 +122,22 @@ class SelectDataWindow(wx.Dialog):
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        flex_grid_sizer = wx.FlexGridSizer(2, 3, 10, 10)
+        flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
         date_begin_label = wx.StaticText(panel, label='C')
         date_begin_edit = wx.adv.DatePickerCtrl(panel,
                                                 style=wx.adv.DP_DROPDOWN,
-                                                size=(130, 30))
-        time_begin_edit = wx.adv.TimePickerCtrl(panel,
-                                                size=(100, 30))
+                                                size=(230, 30))
 
         date_end_label = wx.StaticText(panel, label='По')
         date_end_edit = wx.adv.DatePickerCtrl(panel,
                                               style=wx.adv.DP_DROPDOWN,
-                                              size=(130, 30))
-        time_end_edit = wx.adv.TimePickerCtrl(panel,
-                                              size=(100, 30))
+                                              size=(230, 30))
 
         flex_grid_sizer.AddMany([(date_begin_label),
                                  (date_begin_edit, wx.ID_ANY, wx.EXPAND),
-                                 (time_begin_edit, wx.ID_ANY, wx.EXPAND),
                                  (date_end_label),
-                                 (date_end_edit, wx.ID_ANY, wx.EXPAND),
-                                 (time_end_edit, wx.ID_ANY, wx.EXPAND)])
+                                 (date_end_edit, wx.ID_ANY, wx.EXPAND)])
 
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
@@ -207,7 +196,7 @@ class PlotWindow(wx.Frame):
 
 
 class SendMessageWindow(wx.Dialog):
-    def __init__(self, parent):
+    def __init__(self, parent=None):
         super().__init__(parent=parent,
                          title='Отправка сообщения',
                          size=(290, 170),
@@ -232,15 +221,15 @@ class SendMessageWindow(wx.Dialog):
         self.bearing_choice.SetSelection(0)
 
         date_label = wx.StaticText(panel, label='До')
-        date_edit = wx.adv.DatePickerCtrl(panel,
-                                          style=wx.adv.DP_DROPDOWN,
-                                          size=(130, 30))
+        self.date_edit = wx.adv.DatePickerCtrl(panel,
+                                               style=wx.adv.DP_DROPDOWN,
+                                               size=(170, 30))
 
         flex_grid_sizer.AddMany([(change_bearing_label),
                                  (self.bearing_choice,
                                   wx.ID_ANY, wx.EXPAND),
                                  (date_label),
-                                 (date_edit, wx.ID_ANY, wx.EXPAND)])
+                                 (self.date_edit, wx.ID_ANY, wx.EXPAND)])
 
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
@@ -249,12 +238,39 @@ class SendMessageWindow(wx.Dialog):
         enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
+        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
 
         panel.SetSizer(box_sizer)
 
+    def on_enter_button_click(self, event):
+        bearing_type: str = BEARING_LIST[
+            self.bearing_choice.GetCurrentSelection()
+        ]
+        date: str = str(self.date_edit.GetValue()).split()[0]
+        with open('token.txt', 'r') as token_file:
+            for t in token_file:
+                token: str = t
+        self.send_message(bearing_type, date, token)
+        dialog_text: str = 'Сообщение успешно отправлено'
+        dialog_message = wx.MessageDialog(self,
+                                          dialog_text,
+                                          ' ',
+                                          wx.OK | wx.ICON_INFORMATION)
+        dialog_message.ShowModal()
+
+    def send_message(self, bearing: int, date: str, token: str) -> None:
+        """ Send message to Telegram bot """
+        bot = telegram.Bot(token=token)
+        try:
+            chat_id: int = bot.get_updates()[-1].message.chat_id
+        except IndexError:
+            chat_id: int = 0
+        bot.send_message(
+            chat_id=chat_id, text=f'{bearing} необходимо заменить до {date}')
+
 
 class MainWindow(wx.Frame):
-    def __init__(self, db_connection):
+    def __init__(self, db_connection=None):
         super().__init__(parent=None,
                          title='Основное окно',
                          size=(310, 240),
@@ -307,9 +323,10 @@ class MainWindow(wx.Frame):
         save_prediction_button = wx.Button(panel, label='Записать прогноз')
         save_prediction_button.SetForegroundColour(TEXT_COLOR)
         save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
+
         box_sizer.Add(save_prediction_button,
-                      flag=wx.EXPAND
-                      | wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                      flag=wx.EXPAND |
+                      wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
 
         panel.SetSizer(box_sizer)
@@ -334,22 +351,11 @@ class MainWindow(wx.Frame):
         with SelectDataWindow(self) as select_data_dialog:
             select_data_dialog.ShowModal()
 
-    def prediction_intervals(y_r: np.ndarray, percent: int = 0.97) -> Tuple[
+    def prediction_intervals(y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
         '''Prediction interval'''
         std = y_r.std()
-        if percent == 0.97:
-            koef = 2.1701
-        elif percent == 0.975:
-            koef = 2.2414
-        elif percent == 0.98:
-            koef = 2.3153
-        elif percent == 0.985:
-            koef = 2.4324
-        elif percent == 0.99:
-            koef = 2.5758
-        elif percent == 0.995:
-            koef = 2.807
+        koef = 2.1701
         yr_min = y_r - round(koef * std, 8)
         yr_max = y_r + round(koef * std, 8)
         return yr_min, yr_max
@@ -364,12 +370,16 @@ class MainWindow(wx.Frame):
             send_message_dialog.ShowModal()
 
 
-app = wx.App()
+if __name__ == '__main__':
+    app = wx.App()
 
-# authorization_frame = AuthorizationWindow()
-# authorization_frame.Show()
+    authorization_frame = AuthorizationWindow()
+    authorization_frame.Show()
 
-main_frame = MainWindow()
-main_frame.Show()
+    # main_frame = MainWindow()
+    # main_frame.Show()
 
-app.MainLoop()
+    # send_message_frame = SendMessageWindow()
+    # send_message_frame.Show()
+
+    app.MainLoop()
