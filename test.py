@@ -16,7 +16,7 @@ TEXT_COLOR: str = '#000000'
 
 
 class AuthorizationWindow(wx.Frame):
-    """Window that allows you to enter Information System."""
+    """Window that allows user to enter Information System."""
 
     def __init__(self):
         """Create Authorization Window.
@@ -217,7 +217,18 @@ class PlotWindow(wx.Frame):
 
 
 class SendMessageWindow(wx.Dialog):
+    """Window that allows user to send message to engineer."""
+
     def __init__(self, parent=None):
+        """Create Authorization Window.
+
+        Args:
+            parent: Parent class reference. Defaults to None.
+
+        Attributes:
+            bearing_choice: Choice that contains bearing types.
+            date_edit: Edit that contains user's password.
+        """
         super().__init__(parent=parent,
                          title='Отправка сообщения',
                          size=(290, 170),
@@ -261,7 +272,8 @@ class SendMessageWindow(wx.Dialog):
 
         panel.SetSizer(box_sizer)
 
-    def on_enter_button_click(self, event):
+    def on_enter_button_click(self, event) -> None:
+        """Send message and show message dialog."""
         bearing_type: str = BEARING_LIST[
             self.bearing_choice.GetCurrentSelection()
         ]
@@ -278,7 +290,16 @@ class SendMessageWindow(wx.Dialog):
         dialog_message.ShowModal()
 
     def send_message(self, bearing: int, date: str, token: str) -> None:
-        """ Send message to Telegram bot """
+        """Send message to Telegram bot.
+
+        Args:
+            bearing (int): Bearing type that need to be replaced.
+            date (str): Date by which the bearing must be replaced.
+            token (str): Telegram Bot Token.
+
+        Raises:
+            IndexError: If there aren't messages in the ChatBot.
+        """
         bot = telegram.Bot(token=token)
         try:
             chat_id: int = bot.get_updates()[-1].message.chat_id
@@ -397,8 +418,5 @@ if __name__ == '__main__':
 
     # main_frame = MainWindow()
     # main_frame.Show()
-
-    # send_message_frame = SendMessageWindow()
-    # send_message_frame.Show()
 
     app.MainLoop()
