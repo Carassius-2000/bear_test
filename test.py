@@ -1,5 +1,6 @@
 """Bearing Vibration Prediction Information System"""
 from typing import List, Tuple, Union
+import socket
 import wx
 import wx.adv
 import psycopg2 as pspg2
@@ -22,8 +23,8 @@ class AuthorizationWindow(wx.Frame):
         """Create Authorization Window.
 
         Attributes:
-            login_edit: Edit that contains user's login.
-            password_edit: Edit that contains user's password.
+            login_edit (wx.TextCtrl): Edit that contains user's login.
+            password_edit (wx.TextCtrl): Edit that contains user's password.
         """
         super().__init__(parent=None,
                          title='Вход в систему',
@@ -105,7 +106,7 @@ class AuthorizationWindow(wx.Frame):
             connection: Union[pspg2.extensions.connection,
                               None] = pspg2.connect(connection_string)
         except pspg2.OperationalError:
-            error_text: str = 'Введен неверный логин или пароль'
+            error_text: str = 'Введен неверный логин или пароль.'
             dialog_message = wx.MessageDialog(self,
                                               error_text,
                                               ' ',
@@ -124,6 +125,107 @@ class AuthorizationWindow(wx.Frame):
             self.Destroy()
             main_frame = MainWindow(db_connection=connection)
             main_frame.Show()
+
+
+class MainWindow(wx.Frame):
+    def __init__(self, db_connection=None):
+        super().__init__(parent=None,
+                         title='Основное окно',
+                         size=(310, 240),
+                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
+                         | wx.CAPTION | wx.CLOSE_BOX)
+        self.Center()
+
+        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+        font.SetPointSize(12)
+
+        panel = wx.Panel(self)
+        panel.SetFont(font)
+        panel.SetBackgroundColour(BACKGROUND_COLOR)
+
+        box_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
+        self.bearing_choice.SetSelection(0)
+        box_sizer.Add(self.bearing_choice,
+                      flag=wx.EXPAND | wx.ALL, border=10)
+
+        select_button = wx.Button(panel, label='Выбрать дату прогноза')
+        select_button.SetForegroundColour(TEXT_COLOR)
+        select_button.SetBackgroundColour(BUTTON_COLOR)
+        box_sizer.Add(select_button,
+                      flag=wx.EXPAND |
+                      wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                      border=10)
+        select_button.Bind(wx.EVT_BUTTON, self.on_select_button_click)
+
+        visualization_button = wx.Button(panel, label='Визуализация процесса')
+        visualization_button.SetForegroundColour(TEXT_COLOR)
+        visualization_button.SetBackgroundColour(BUTTON_COLOR)
+        box_sizer.Add(visualization_button,
+                      flag=wx.EXPAND |
+                      wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                      border=10)
+        visualization_button.Bind(wx.EVT_BUTTON, self.visualize)
+
+        send_message_button = wx.Button(panel, label='Отправить сообщение')
+        send_message_button.SetForegroundColour(TEXT_COLOR)
+        send_message_button.SetBackgroundColour(BUTTON_COLOR)
+        box_sizer.Add(send_message_button,
+                      flag=wx.EXPAND
+                      | wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                      border=10)
+        send_message_button.Bind(
+            wx.EVT_BUTTON, self.on_send_message_button_click)
+
+        save_prediction_button = wx.Button(panel, label='Записать прогноз')
+        save_prediction_button.SetForegroundColour(TEXT_COLOR)
+        save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
+
+        box_sizer.Add(save_prediction_button,
+                      flag=wx.EXPAND |
+                      wx.LEFT | wx.RIGHT | wx.BOTTOM,
+                      border=10)
+
+        panel.SetSizer(box_sizer)
+
+        self.Bind(wx.EVT_CLOSE, self.on_close_window)
+
+    def on_close_window(self, event):
+        question: str = 'Вы действительно хотите выйти из приложения?'
+        dialog_message = wx.MessageDialog(self,
+                                          question,
+                                          ' ',
+                                          wx.YES_NO | wx.YES_DEFAULT
+                                          | wx.ICON_WARNING)
+        result = dialog_message.ShowModal()
+
+        if result == wx.ID_YES:
+            self.Destroy()
+        else:
+            event.Veto()
+
+    def on_select_button_click(self, event):
+        with SelectDataWindow(self) as select_data_dialog:
+            select_data_dialog.ShowModal()
+
+    def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
+            np.ndarray, np.ndarray]:
+        '''Prediction interval'''
+        std = y_r.std()
+        koef = 2.1701
+        yr_min = y_r - round(koef * std, 8)
+        yr_max = y_r + round(koef * std, 8)
+        return yr_min, yr_max
+
+    def visualize(self, event) -> None:
+        plt.grid(axis='y')
+        plt.show()
+        self.SetSize(wx.Size((310, 240)))
+
+    def on_send_message_button_click(self, event):
+        with SendMessageWindow(self) as send_message_dialog:
+            send_message_dialog.ShowModal()
 
 
 class SelectDataWindow(wx.Dialog):
@@ -226,8 +328,8 @@ class SendMessageWindow(wx.Dialog):
             parent: Parent class reference. Defaults to None.
 
         Attributes:
-            bearing_choice: Choice that contains bearing types.
-            date_edit: Edit that contains user's password.
+            bearing_choice (wx.Choice): Choice that contains bearing types.
+            date_edit (wx.adv.DatePickerCtrl): Edit that contains user's password.
         """
         super().__init__(parent=parent,
                          title='Отправка сообщения',
@@ -275,8 +377,7 @@ class SendMessageWindow(wx.Dialog):
     def on_enter_button_click(self, event) -> None:
         """Send message and show message dialog."""
         bearing_type: str = BEARING_LIST[
-            self.bearing_choice.GetCurrentSelection()
-        ]
+            self.bearing_choice.GetCurrentSelection()]
         date: str = str(self.date_edit.GetValue()).split()[0]
         with open('token.txt', 'r') as token_file:
             for t in token_file:
@@ -305,118 +406,39 @@ class SendMessageWindow(wx.Dialog):
             chat_id: int = bot.get_updates()[-1].message.chat_id
         except IndexError:
             chat_id: int = 0
-        bot.send_message(
-            chat_id=chat_id, text=f'{bearing} необходимо заменить до {date}')
+        except telegram.error.BadRequest:
+            dialog_text: str = 'Отправьте сообщение боту и попробуете еще раз'
+            dialog_message = wx.MessageDialog(self,
+                                              dialog_text,
+                                              ' ',
+                                              wx.OK | wx.ICON_INFORMATION)
+            dialog_message.ShowModal()
+        finally:
+            bot.send_message(
+                chat_id=chat_id,
+                text=f'{bearing} необходимо заменить до {date}')
 
 
-class MainWindow(wx.Frame):
-    def __init__(self, db_connection=None):
-        super().__init__(parent=None,
-                         title='Основное окно',
-                         size=(310, 240),
-                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
-                         | wx.CAPTION | wx.CLOSE_BOX)
-        self.Center()
-
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(12)
-
-        panel = wx.Panel(self)
-        panel.SetFont(font)
-        panel.SetBackgroundColour(BACKGROUND_COLOR)
-
-        box_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        self.bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
-        self.bearing_choice.SetSelection(0)
-        box_sizer.Add(self.bearing_choice,
-                      flag=wx.EXPAND | wx.ALL, border=10)
-
-        select_button = wx.Button(panel, label='Выбрать дату прогноза')
-        select_button.SetForegroundColour(TEXT_COLOR)
-        select_button.SetBackgroundColour(BUTTON_COLOR)
-        box_sizer.Add(select_button,
-                      flag=wx.EXPAND |
-                      wx.LEFT | wx.RIGHT | wx.BOTTOM,
-                      border=10)
-        select_button.Bind(wx.EVT_BUTTON, self.on_select_button_click)
-
-        visualization_button = wx.Button(panel, label='Визуализация процесса')
-        visualization_button.SetForegroundColour(TEXT_COLOR)
-        visualization_button.SetBackgroundColour(BUTTON_COLOR)
-        box_sizer.Add(visualization_button,
-                      flag=wx.EXPAND |
-                      wx.LEFT | wx.RIGHT | wx.BOTTOM,
-                      border=10)
-        visualization_button.Bind(wx.EVT_BUTTON, self.visualize)
-
-        send_message_button = wx.Button(panel, label='Отправить сообщение')
-        send_message_button.SetForegroundColour(TEXT_COLOR)
-        send_message_button.SetBackgroundColour(BUTTON_COLOR)
-        box_sizer.Add(send_message_button,
-                      flag=wx.EXPAND
-                      | wx.LEFT | wx.RIGHT | wx.BOTTOM,
-                      border=10)
-        send_message_button.Bind(
-            wx.EVT_BUTTON, self.on_send_message_button_click)
-
-        save_prediction_button = wx.Button(panel, label='Записать прогноз')
-        save_prediction_button.SetForegroundColour(TEXT_COLOR)
-        save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
-
-        box_sizer.Add(save_prediction_button,
-                      flag=wx.EXPAND |
-                      wx.LEFT | wx.RIGHT | wx.BOTTOM,
-                      border=10)
-
-        panel.SetSizer(box_sizer)
-
-        self.Bind(wx.EVT_CLOSE, self.on_close_window)
-
-    def on_close_window(self, event):
-        question: str = 'Вы действительно хотите выйти из приложения?'
-        dialog_message = wx.MessageDialog(self,
-                                          question,
-                                          ' ',
-                                          wx.YES_NO | wx.YES_DEFAULT
-                                          | wx.ICON_WARNING)
-        result = dialog_message.ShowModal()
-
-        if result == wx.ID_YES:
-            self.Destroy()
-        else:
-            event.Veto()
-
-    def on_select_button_click(self, event):
-        with SelectDataWindow(self) as select_data_dialog:
-            select_data_dialog.ShowModal()
-
-    def prediction_intervals(y_r: np.ndarray) -> Tuple[
-            np.ndarray, np.ndarray]:
-        '''Prediction interval'''
-        std = y_r.std()
-        koef = 2.1701
-        yr_min = y_r - round(koef * std, 8)
-        yr_max = y_r + round(koef * std, 8)
-        return yr_min, yr_max
-
-    def visualize(self, event) -> None:
-        plt.grid(axis='y')
-        plt.show()
-        self.SetSize(wx.Size((310, 240)))
-
-    def on_send_message_button_click(self, event):
-        with SendMessageWindow(self) as send_message_dialog:
-            send_message_dialog.ShowModal()
+def internet_connection_fail() -> None:
+    """Show error dialog."""
+    error_text: str = 'Проверьте подключение к интернету.'
+    error_message = wx.MessageDialog(None,
+                                     error_text,
+                                     ' ',
+                                     wx.OK | wx.ICON_ERROR)
+    error_message.ShowModal()
 
 
 if __name__ == '__main__':
     app = wx.App()
-
-    authorization_frame = AuthorizationWindow()
-    authorization_frame.Show()
-
+    # check internet connection
+    try:
+        socket.create_connection(("www.google.com", 80))
+    except OSError:
+        internet_connection_fail()
+    else:
+        authorization_frame = AuthorizationWindow()
+        authorization_frame.Show()    
     # main_frame = MainWindow()
     # main_frame.Show()
-
     app.MainLoop()
