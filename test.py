@@ -112,7 +112,7 @@ class AuthorizationWindow(wx.Frame):
                                               ' ',
                                               wx.OK | wx.ICON_ERROR)
             dialog_message.ShowModal()
-            return None
+            return
         else:
             return connection
 
@@ -120,11 +120,12 @@ class AuthorizationWindow(wx.Frame):
         """Enter Information System."""
         login: str = self.login_edit.GetValue()
         password: str = self.password_edit.GetValue()
-        connection = self.get_connection(login, password)
-        if connection:
-            self.Destroy()
-            main_frame = MainWindow(db_connection=connection)
-            main_frame.Show()
+        if check_internet_connection():
+            connection = self.get_connection(login, password)
+            if connection:
+                self.Destroy()
+                main_frame = MainWindow(db_connection=connection)
+                main_frame.Show()
 
 
 class MainWindow(wx.Frame):
@@ -382,13 +383,14 @@ class SendMessageWindow(wx.Dialog):
         with open('token.txt', 'r') as token_file:
             for t in token_file:
                 token: str = t
-        self.send_message(bearing_type, date, token)
-        dialog_text: str = 'Сообщение успешно отправлено'
-        dialog_message = wx.MessageDialog(self,
-                                          dialog_text,
-                                          ' ',
-                                          wx.OK | wx.ICON_INFORMATION)
-        dialog_message.ShowModal()
+        if check_internet_connection():
+            self.send_message(bearing_type, date, token)
+            dialog_text: str = 'Сообщение успешно отправлено'
+            dialog_message = wx.MessageDialog(self,
+                                              dialog_text,
+                                              ' ',
+                                              wx.OK | wx.ICON_INFORMATION)
+            dialog_message.ShowModal()
 
     def send_message(self, bearing: int, date: str, token: str) -> None:
         """Send message to Telegram bot.
@@ -406,21 +408,20 @@ class SendMessageWindow(wx.Dialog):
             chat_id: int = bot.get_updates()[-1].message.chat_id
         except IndexError:
             chat_id: int = 0
-        except telegram.error.BadRequest:
-            dialog_text: str = 'Отправьте сообщение боту и попробуете еще раз'
-            dialog_message = wx.MessageDialog(self,
-                                              dialog_text,
-                                              ' ',
-                                              wx.OK | wx.ICON_INFORMATION)
-            dialog_message.ShowModal()
-        finally:
-            bot.send_message(
-                chat_id=chat_id,
-                text=f'{bearing} необходимо заменить до {date}')
+        # except telegram.error.BadRequest:
+        #     dialog_text: str = 'Отправьте сообщение боту и попробуете еще раз'
+        #     dialog_message = wx.MessageDialog(self,
+        #                                       dialog_text,
+        #                                       ' ',
+        #                                       wx.OK | wx.ICON_INFORMATION)
+        #     dialog_message.ShowModal()
+        bot.send_message(
+            chat_id=chat_id,
+            text=f'{bearing} необходимо заменить до {date}')
 
 
 def internet_connection_fail() -> None:
-    """Show error dialog."""
+    """Show internet connection error dialog."""
     error_text: str = 'Проверьте подключение к интернету.'
     error_message = wx.MessageDialog(None,
                                      error_text,
@@ -429,16 +430,27 @@ def internet_connection_fail() -> None:
     error_message.ShowModal()
 
 
-if __name__ == '__main__':
-    app = wx.App()
-    # check internet connection
+def check_internet_connection() -> bool:
+    """Try to ping www.google.com.
+
+    Returns:
+        bool: True if the attempt was successful.
+    """
     try:
         socket.create_connection(("www.google.com", 80))
     except OSError:
         internet_connection_fail()
     else:
-        authorization_frame = AuthorizationWindow()
-        authorization_frame.Show()    
-    # main_frame = MainWindow()
-    # main_frame.Show()
+        return True
+
+
+if __name__ == '__main__':
+    app = wx.App()
+
+    # authorization_frame = AuthorizationWindow()
+    # authorization_frame.Show()
+
+    main_frame = MainWindow()
+    main_frame.Show()
+
     app.MainLoop()
