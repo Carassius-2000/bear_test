@@ -330,7 +330,8 @@ class SendMessageWindow(wx.Dialog):
 
         Attributes:
             bearing_choice (wx.Choice): Choice that contains bearing types.
-            date_edit (wx.adv.DatePickerCtrl): Edit that contains user's password.
+            date_edit (wx.adv.DatePickerCtrl):\
+            Edit that contains user's password.
         """
         super().__init__(parent=parent,
                          title='Отправка сообщения',
@@ -401,23 +402,17 @@ class SendMessageWindow(wx.Dialog):
             token (str): Telegram Bot Token.
 
         Raises:
-            IndexError: If there aren't messages in the ChatBot.
+            IndexError: If there aren't messages in the chat.
         """
         bot = telegram.Bot(token=token)
         try:
             chat_id: int = bot.get_updates()[-1].message.chat_id
         except IndexError:
             chat_id: int = 0
-        # except telegram.error.BadRequest:
-        #     dialog_text: str = 'Отправьте сообщение боту и попробуете еще раз'
-        #     dialog_message = wx.MessageDialog(self,
-        #                                       dialog_text,
-        #                                       ' ',
-        #                                       wx.OK | wx.ICON_INFORMATION)
-        #     dialog_message.ShowModal()
-        bot.send_message(
-            chat_id=chat_id,
-            text=f'{bearing} необходимо заменить до {date}')
+        finally:
+            bot.send_message(
+                chat_id=chat_id,
+                text=f'{bearing} необходимо заменить до {date}')
 
 
 def internet_connection_fail() -> None:
