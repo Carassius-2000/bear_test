@@ -7,10 +7,20 @@ import psycopg2 as pspg2
 import matplotlib.pyplot as plt
 import numpy as np
 import telegram
+import matplotlib
+import pandas as pd
+from matplotlib.backends.backend_wxagg import (
+    NavigationToolbar2WxAgg as NavigationToolbar,
+    FigureCanvasWxAgg as FigureCanvas)
+from matplotlib.figure import Figure
+import seaborn as sns
+sns.set_theme()
+matplotlib.use('WXAgg')
 
 BEARING_LIST: List[str] = ['Первый подшипник',
                            'Второй подшипник',
                            'Третий подшипник']
+MAX_BEARINGS_VIBRATION: List[int] = [5, 2, 3]
 BACKGROUND_COLOR: str = '#fff1e6'
 BUTTON_COLOR: str = '#1bc163'
 TEXT_COLOR: str = '#000000'
@@ -126,6 +136,7 @@ class AuthorizationWindow(wx.Frame):
 
 
 class MainWindow(wx.Frame):
+
     def __init__(self, db_connection=None):
         super().__init__(parent=None,
                          title='Основное окно',
@@ -154,6 +165,15 @@ class MainWindow(wx.Frame):
                       border=10)
         select_button.Bind(wx.EVT_BUTTON, self.on_select_button_click)
 
+        # self.df = None
+        y = np.arange(1, 11)
+        y_mn = y - 1
+        y_mx = y + 1
+        self.df = pd.DataFrame({'date': np.arange(1, len(y) + 1),
+                                'val': y,
+                                'val_max': y_mx,
+                                'val_min': y_mn})
+
         visualization_button = wx.Button(panel, label='Визуализация процесса')
         visualization_button.SetForegroundColour(TEXT_COLOR)
         visualization_button.SetBackgroundColour(BUTTON_COLOR)
@@ -161,7 +181,8 @@ class MainWindow(wx.Frame):
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
-        visualization_button.Bind(wx.EVT_BUTTON, self.visualize)
+        visualization_button.Bind(wx.EVT_BUTTON,
+                                  self.on_visualization_button_click)
 
         send_message_button = wx.Button(panel, label='Отправить сообщение')
         send_message_button.SetForegroundColour(TEXT_COLOR)
@@ -213,10 +234,10 @@ class MainWindow(wx.Frame):
         yr_max = y_r + round(koef * std, 8)
         return yr_min, yr_max
 
-    def visualize(self, event) -> None:
-        plt.grid(axis='y')
-        plt.show()
-        self.SetSize(wx.Size((310, 240)))
+    def on_visualization_button_click(self, event) -> None:
+
+        with PlotWindow(self, self.df) as plot_window_dialog:
+            plot_window_dialog.ShowModal()
 
     def on_send_message_button_click(self, event):
         with SendMessageWindow(self) as send_message_dialog:
@@ -265,59 +286,117 @@ class SelectDataWindow(wx.Dialog):
         panel.SetSizer(box_sizer)
 
 
-class PlotWindow(wx.Frame):
+class CanvasPanel(wx.Panel):
+    """Panel that contains canvas with plot on it."""
+
     def __init__(self, parent):
-        super().__init__(parent,
-                         title='Визуализация',
-                         size=(270, 170),
-                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
-                         | wx.CAPTION | wx.CLOSE_BOX)
-        self.Center()
+        """Create Canvas Panel.
 
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(12)
+        Args:
+            parent: Parent class reference.
 
-        panel = wx.Panel(self)
-        panel.SetFont(font)
-        panel.SetBackgroundColour(BACKGROUND_COLOR)
+        Attributes:
+            axes (matplotlib.axes._subplots.AxesSubplot): \
+                Axes that contain plots.
+        """
+        super().__init__(parent)
+
+        figure = Figure()
+        self.axes = figure.add_subplot(111)
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
+        canvas = FigureCanvas(self, -1, figure)
+        box_sizer.Add(canvas, 1, wx.LEFT | wx.TOP | wx.GROW)
 
-        login_label = wx.StaticText(panel, label='Логин')
-        login_edit = wx.TextCtrl(panel, size=(170, 30))
+        toolbar = NavigationToolbar(canvas)
+        toolbar.Realize()
+        box_sizer.Add(toolbar, 0, wx.LEFT | wx.EXPAND)
 
-        password_label = wx.StaticText(panel, label='Пароль')
-        password_edit = wx.TextCtrl(panel,
-                                    size=(170, 30),
-                                    style=wx.TE_PASSWORD)
+        self.SetSizer(box_sizer)
+        self.Fit()
 
-        flex_grid_sizer.AddMany([(login_label),
-                                 (login_edit, wx.ID_ANY, wx.EXPAND),
-                                 (password_label),
-                                 (password_edit, wx.ID_ANY, wx.EXPAND)])
+    def get_outliers(self,
+                     df: pd.core.frame.DataFrame,
+                     bearing_type: int) -> pd.core.frame.DataFrame:
+        """Get outliers DataFrame.
 
-        box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
+        Args:
+            df (pd.core.frame.DataFrame): DataFrame that contain fitted values\
+                with prediction interval.
+                bearing_type (int): .
 
-        enter_button = wx.Button(panel, label='Войти')
-        box_sizer.Add(enter_button,
-                      flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
-        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
+        Returns:
+            pd.core.frame.DataFrame: DataFrame that contain outliers.
+        """
+        condition: bool = df['val'] > MAX_BEARINGS_VIBRATION[bearing_type - 1]
+        df_out = pd.DataFrame({'val': df[condition].val,
+                               'date': df[condition].date})
+        return df_out
 
-        panel.SetSizer(box_sizer)
+    def show_plot(self,
+                  df: pd.core.frame.DataFrame) -> None:
+        """Show plot with predictions.
 
-        self.Bind(wx.EVT_CLOSE, self.on_close_window)
+        Args:
+            df (pd.core.frame.DataFrame): DataFrame that contain fitted values\
+                with prediction interval.
+        """
+        bearing_id = 'Первого'
+        self.axes.plot(df['date'], df['val'],
+                       label='Прогнозные значения', color='blue')
+        self.axes.plot(df['date'], df['val_min'],
+                       linestyle='--', color='cyan',
+                       label='Минимальные прогнозные значения')
+        self.axes.plot(df['date'], df['val_max'],
+                       linestyle='--', color='orange',
+                       label='Максимальные прогнозные значения')
+
+        outlier_df = self.get_outliers(df, bearing_type=1)
+        if not outlier_df.empty:
+            self.axes.plot(outlier_df.date,
+                           outlier_df.val,
+                           linestyle='', marker='o',
+                           color='red', label='Аномальные значения')
+        self.axes.set_title(f'Вибрация {bearing_id}', fontsize=12)
+        self.axes.set_xlabel('Время', fontsize=12)
+        self.axes.set_ylabel('Вибрация ()', fontsize=12)
+        self.axes.legend(loc='best', shadow=True, fontsize=12)
+
+
+class PlotWindow(wx.Dialog):
+    """Window that shows bearing vibration plot."""
+
+    def __init__(self, parent, df: pd.core.frame.DataFrame):
+        """Create Plot Window.
+
+        Args:
+            parent: Parent class reference.
+
+        Attributes:
+            panel (CanvasPanel): Panel that contains canvas with plot.
+        """
+        super().__init__(parent=parent,
+                         title='Окно визуализации',
+                         size=(620, 620),
+                         style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
+                         | wx.CAPTION | wx.CLOSE_BOX
+                         | wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
+        self.Center()
+
+        self.panel = CanvasPanel(self)
+
+        self.panel.show_plot(df)
 
 
 class SendMessageWindow(wx.Dialog):
     """Window that allows user to send message to engineer."""
 
     def __init__(self, parent=None):
-        """Create Authorization Window.
+        """Create Send Message Window.
 
         Args:
-            parent: Parent class reference. Defaults to None.
+            parent: Parent class reference.
 
         Attributes:
             bearing_choice (wx.Choice): Choice that contains bearing types.
@@ -433,9 +512,9 @@ if __name__ == '__main__':
     APP_FONT = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
     APP_FONT.SetPointSize(12)
 
-    authorization_frame = AuthorizationWindow()
-    authorization_frame.Show()
-    # main_frame = MainWindow()
-    # main_frame.Show()
+    # authorization_frame = AuthorizationWindow()
+    # authorization_frame.Show()
+    main_frame = MainWindow()
+    main_frame.Show()
 
     app.MainLoop()
