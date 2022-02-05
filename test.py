@@ -32,12 +32,9 @@ class AuthorizationWindow(wx.Frame):
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
-        # get OS default font
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(12)
 
         panel = wx.Panel(self)
-        panel.SetFont(font)
+        panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
         # create FlexGridSizer that contains login and password edits
         # with their respective labels
@@ -124,7 +121,7 @@ class AuthorizationWindow(wx.Frame):
             connection = self.get_connection(login, password)
             if connection:
                 self.Destroy()
-                main_frame = MainWindow(db_connection=connection)
+                main_frame = MainWindow(self.font, db_connection=connection)
                 main_frame.Show()
 
 
@@ -137,11 +134,8 @@ class MainWindow(wx.Frame):
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(12)
-
         panel = wx.Panel(self)
-        panel.SetFont(font)
+        panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -238,11 +232,8 @@ class SelectDataWindow(wx.Dialog):
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(12)
-
         panel = wx.Panel(self)
-        panel.SetFont(font)
+        panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
 
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
@@ -340,11 +331,8 @@ class SendMessageWindow(wx.Dialog):
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
-        font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
-        font.SetPointSize(12)
-
         panel = wx.Panel(self)
-        panel.SetFont(font)
+        panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
 
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
@@ -441,11 +429,13 @@ def check_internet_connection() -> bool:
 
 if __name__ == '__main__':
     app = wx.App()
+    # get OS default font
+    APP_FONT = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+    APP_FONT.SetPointSize(12)
 
-    # authorization_frame = AuthorizationWindow()
-    # authorization_frame.Show()
-
-    main_frame = MainWindow()
-    main_frame.Show()
+    authorization_frame = AuthorizationWindow()
+    authorization_frame.Show()
+    # main_frame = MainWindow()
+    # main_frame.Show()
 
     app.MainLoop()
