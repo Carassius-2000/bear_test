@@ -1,5 +1,5 @@
 """Bearing Vibration Prediction Information System"""
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 import socket
 import wx
 import wx.adv
@@ -20,7 +20,8 @@ matplotlib.use('WXAgg')
 BEARING_LIST: List[str] = ['Первый подшипник',
                            'Второй подшипник',
                            'Третий подшипник']
-MAX_BEARINGS_VIBRATION: List[int] = [5, 2, 3]
+# MAX_BEARINGS_VIBRATION: List[int] = [5, 2, 3]
+MAX_BEARINGS_VIBRATION: Dict[int, int] = {0: 5, 1: 2, 2: 3}
 BACKGROUND_COLOR: str = '#fff1e6'
 BUTTON_COLOR: str = '#1bc163'
 TEXT_COLOR: str = '#000000'
@@ -235,8 +236,8 @@ class MainWindow(wx.Frame):
         return yr_min, yr_max
 
     def on_visualization_button_click(self, event) -> None:
-
-        with PlotWindow(self, self.df) as plot_window_dialog:
+        bearing_type: int = self.bearing_choice.GetCurrentSelection()
+        with PlotWindow(self, self.df, bearing_type) as plot_window_dialog:
             plot_window_dialog.ShowModal()
 
     def on_send_message_button_click(self, event):
@@ -329,20 +330,21 @@ class CanvasPanel(wx.Panel):
         Returns:
             pd.core.frame.DataFrame: DataFrame that contain outliers.
         """
-        condition: bool = df['val'] > MAX_BEARINGS_VIBRATION[bearing_type - 1]
+        condition: bool = df['val'] > MAX_BEARINGS_VIBRATION[bearing_type]
         df_out = pd.DataFrame({'val': df[condition].val,
                                'date': df[condition].date})
         return df_out
 
     def show_plot(self,
-                  df: pd.core.frame.DataFrame) -> None:
+                  df: pd.core.frame.DataFrame,
+                  bearing_type: int) -> None:
         """Show plot with predictions.
 
         Args:
             df (pd.core.frame.DataFrame): DataFrame that contain fitted values\
                 with prediction interval.
         """
-        bearing_id = 'Первого'
+        bearing_name: str = BEARING_LIST[bearing_type]
         self.axes.plot(df['date'], df['val'],
                        label='Прогнозные значения', color='blue')
         self.axes.plot(df['date'], df['val_min'],
@@ -352,22 +354,24 @@ class CanvasPanel(wx.Panel):
                        linestyle='--', color='orange',
                        label='Максимальные прогнозные значения')
 
-        outlier_df = self.get_outliers(df, bearing_type=1)
+        outlier_df = self.get_outliers(df, bearing_type=0)
         if not outlier_df.empty:
             self.axes.plot(outlier_df.date,
                            outlier_df.val,
                            linestyle='', marker='o',
                            color='red', label='Аномальные значения')
-        self.axes.set_title(f'Вибрация {bearing_id}', fontsize=12)
+        self.axes.set_title(f'{bearing_name}', fontsize=12)
         self.axes.set_xlabel('Время', fontsize=12)
-        self.axes.set_ylabel('Вибрация ()', fontsize=12)
+        self.axes.set_ylabel('Вибрация (мкм)', fontsize=12)
         self.axes.legend(loc='best', shadow=True, fontsize=12)
 
 
 class PlotWindow(wx.Dialog):
     """Window that shows bearing vibration plot."""
 
-    def __init__(self, parent, df: pd.core.frame.DataFrame):
+    def __init__(self, parent, 
+                 df: pd.core.frame.DataFrame,
+                 bearing_type: int):
         """Create Plot Window.
 
         Args:
@@ -386,7 +390,7 @@ class PlotWindow(wx.Dialog):
 
         self.panel = CanvasPanel(self)
 
-        self.panel.show_plot(df)
+        self.panel.show_plot(df, bearing_type)
 
 
 class SendMessageWindow(wx.Dialog):
