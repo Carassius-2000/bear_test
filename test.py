@@ -4,7 +4,6 @@ import socket
 import wx
 import wx.adv
 import psycopg2 as pspg2
-import matplotlib.pyplot as plt
 import numpy as np
 import telegram
 import matplotlib
@@ -318,46 +317,49 @@ class CanvasPanel(wx.Panel):
         self.Fit()
 
     def get_outliers(self,
-                     df: pd.core.frame.DataFrame,
+                     pandas_data_frame: pd.core.frame.DataFrame,
                      bearing_type: int) -> pd.core.frame.DataFrame:
         """Get outliers DataFrame.
 
         Args:
-            df (pd.core.frame.DataFrame): DataFrame that contain fitted values\
-                with prediction interval.
-                bearing_type (int): .
+            pandas_data_frame (pd.core.frame.DataFrame):\
+            DataFrame that contain fitted values with prediction interval.
+            bearing_type (int): Need to determine the limit value of vibration.
 
         Returns:
             pd.core.frame.DataFrame: DataFrame that contain outliers.
         """
-        condition: bool = df['val'] > MAX_BEARINGS_VIBRATION[bearing_type]
-        df_out = pd.DataFrame({'val': df[condition].val,
-                               'date': df[condition].date})
+        condition: bool = pandas_data_frame['val'] > MAX_BEARINGS_VIBRATION[
+            bearing_type]
+        df_out = pd.DataFrame({'val': pandas_data_frame[condition].val,
+                               'date': pandas_data_frame[condition].date})
         return df_out
 
     def show_plot(self,
-                  df: pd.core.frame.DataFrame,
+                  pandas_data_frame: pd.core.frame.DataFrame,
                   bearing_type: int) -> None:
         """Show plot with predictions.
 
         Args:
-            df (pd.core.frame.DataFrame): DataFrame that contain fitted values\
-                with prediction interval.
+            pandas_data_frame (pd.core.frame.DataFrame):\
+            DataFrame that contain fitted values with prediction interval.
+            bearing_type (int): Need to determine the limit value of vibration..
         """
         bearing_name: str = BEARING_LIST[bearing_type]
-        self.axes.plot(df['date'], df['val'],
+        self.axes.plot(pandas_data_frame['date'], pandas_data_frame['val'],
                        label='Прогнозные значения', color='blue')
-        self.axes.plot(df['date'], df['val_min'],
+        self.axes.plot(pandas_data_frame['date'], pandas_data_frame['val_min'],
                        linestyle='--', color='cyan',
                        label='Минимальные прогнозные значения')
-        self.axes.plot(df['date'], df['val_max'],
+        self.axes.plot(pandas_data_frame['date'], pandas_data_frame['val_max'],
                        linestyle='--', color='orange',
                        label='Максимальные прогнозные значения')
 
-        outlier_df = self.get_outliers(df, bearing_type=0)
-        if not outlier_df.empty:
-            self.axes.plot(outlier_df.date,
-                           outlier_df.val,
+        outlier_data_frame = self.get_outliers(pandas_data_frame,
+                                               bearing_type=bearing_type)
+        if not outlier_data_frame.empty:
+            self.axes.plot(outlier_data_frame.date,
+                           outlier_data_frame.val,
                            linestyle='', marker='o',
                            color='red', label='Аномальные значения')
         self.axes.set_title(f'{bearing_name}', fontsize=12)
@@ -369,8 +371,8 @@ class CanvasPanel(wx.Panel):
 class PlotWindow(wx.Dialog):
     """Window that shows bearing vibration plot."""
 
-    def __init__(self, parent, 
-                 df: pd.core.frame.DataFrame,
+    def __init__(self, parent,
+                 pandas_data_frame: pd.core.frame.DataFrame,
                  bearing_type: int):
         """Create Plot Window.
 
@@ -390,7 +392,7 @@ class PlotWindow(wx.Dialog):
 
         self.panel = CanvasPanel(self)
 
-        self.panel.show_plot(df, bearing_type)
+        self.panel.show_plot(pandas_data_frame, bearing_type)
 
 
 class SendMessageWindow(wx.Dialog):
