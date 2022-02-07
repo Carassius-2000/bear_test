@@ -19,7 +19,6 @@ matplotlib.use('WXAgg')
 BEARING_LIST: List[str] = ['Первый подшипник',
                            'Второй подшипник',
                            'Третий подшипник']
-# MAX_BEARINGS_VIBRATION: List[int] = [5, 2, 3]
 MAX_BEARINGS_VIBRATION: Dict[int, int] = {0: 5, 1: 2, 2: 3}
 BACKGROUND_COLOR: str = '#fff1e6'
 BUTTON_COLOR: str = '#1bc163'
@@ -131,7 +130,7 @@ class AuthorizationWindow(wx.Frame):
             connection = self.get_connection(login, password)
             if connection:
                 self.Destroy()
-                main_frame = MainWindow(self.font, db_connection=connection)
+                main_frame = MainWindow(db_connection=connection)
                 main_frame.Show()
 
 
@@ -139,7 +138,7 @@ class MainWindow(wx.Frame):
 
     def __init__(self, db_connection=None):
         super().__init__(parent=None,
-                         title='Основное окно',
+                         title='Главное окно',
                          size=(310, 240),
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
@@ -518,9 +517,9 @@ if __name__ == '__main__':
     APP_FONT = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
     APP_FONT.SetPointSize(12)
 
-    # authorization_frame = AuthorizationWindow()
-    # authorization_frame.Show()
-    main_frame = MainWindow()
-    main_frame.Show()
+    authorization_frame = AuthorizationWindow()
+    authorization_frame.Show()
+    # main_frame = MainWindow()
+    # main_frame.Show()
 
     app.MainLoop()
