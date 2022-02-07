@@ -342,7 +342,7 @@ class CanvasPanel(wx.Panel):
         Args:
             pandas_data_frame (pd.core.frame.DataFrame):\
             DataFrame that contain fitted values with prediction interval.
-            bearing_type (int): Need to determine the limit value of vibration..
+            bearing_type (int): Need to determine the limit value of vibration.
         """
         bearing_name: str = BEARING_LIST[bearing_type]
         self.axes.plot(pandas_data_frame['date'], pandas_data_frame['val'],
@@ -481,10 +481,25 @@ class SendMessageWindow(wx.Dialog):
             chat_id: int = bot.get_updates()[-1].message.chat_id
         except IndexError:
             chat_id: int = 0
-        finally:
+
+        try:
             bot.send_message(
                 chat_id=chat_id,
                 text=f'{bearing} необходимо заменить до {date}')
+        except telegram.error.BadRequest:
+            dialog_text: str = 'Напишите сообщение в чат.'
+            dialog_message = wx.MessageDialog(self,
+                                              dialog_text,
+                                              ' ',
+                                              wx.OK | wx.ICON_ERROR)
+            dialog_message.ShowModal()
+        else:
+            dialog_text: str = 'Сообщение успешно отправлено'
+            dialog_message = wx.MessageDialog(self,
+                                              dialog_text,
+                                              ' ',
+                                              wx.OK | wx.ICON_INFORMATION)
+            dialog_message.ShowModal()
 
 
 def internet_connection_fail() -> None:
@@ -517,9 +532,9 @@ if __name__ == '__main__':
     APP_FONT = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
     APP_FONT.SetPointSize(12)
 
-    authorization_frame = AuthorizationWindow()
-    authorization_frame.Show()
-    # main_frame = MainWindow()
-    # main_frame.Show()
+    # authorization_frame = AuthorizationWindow()
+    # authorization_frame.Show()
+    main_frame = MainWindow()
+    main_frame.Show()
 
     app.MainLoop()
