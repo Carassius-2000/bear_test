@@ -5,7 +5,10 @@ import wx
 import wx.adv
 import psycopg2 as pspg2
 import numpy as np
-import telegram
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from smtplib import SMTP
+import ssl
 import matplotlib
 import pandas as pd
 from matplotlib.backends.backend_wxagg import (
@@ -453,11 +456,8 @@ class SendMessageWindow(wx.Dialog):
         bearing_type: str = BEARING_LIST[
             self.bearing_choice.GetCurrentSelection()]
         date: str = str(self.date_edit.GetValue()).split()[0]
-        with open('token.txt', 'r') as token_file:
-            for t in token_file:
-                token: str = t
         if check_internet_connection():
-            self.send_message(bearing_type, date, token)
+            self.send_mail(bearing_type, date)
             dialog_text: str = 'Сообщение успешно отправлено'
             dialog_message = wx.MessageDialog(self,
                                               dialog_text,
@@ -465,41 +465,49 @@ class SendMessageWindow(wx.Dialog):
                                               wx.OK | wx.ICON_INFORMATION)
             dialog_message.ShowModal()
 
-    def send_message(self, bearing: int, date: str, token: str) -> None:
-        """Send message to Telegram bot.
+    def send_mail(self, bearing: int, date: str) -> None:
+        """Send e-mail using Simple Mail Transfer Protocol.
 
         Args:
             bearing (int): Bearing type that need to be replaced.
             date (str): Date by which the bearing must be replaced.
-            token (str): Telegram Bot Token.
-
-        Raises:
-            IndexError: If there aren't messages in the chat.
         """
-        bot = telegram.Bot(token=token)
-        try:
-            chat_id: int = bot.get_updates()[-1].message.chat_id
-        except IndexError:
-            chat_id: int = 0
+        SMTP_SERVER: str = "smtp.gmail.com"
+        PORT: int = 587
 
-        try:
-            bot.send_message(
-                chat_id=chat_id,
-                text=f'{bearing} необходимо заменить до {date}')
-        except telegram.error.BadRequest:
-            dialog_text: str = 'Напишите сообщение в чат.'
-            dialog_message = wx.MessageDialog(self,
-                                              dialog_text,
-                                              ' ',
-                                              wx.OK | wx.ICON_ERROR)
-            dialog_message.ShowModal()
-        else:
-            dialog_text: str = 'Сообщение успешно отправлено'
-            dialog_message = wx.MessageDialog(self,
-                                              dialog_text,
-                                              ' ',
-                                              wx.OK | wx.ICON_INFORMATION)
-            dialog_message.ShowModal()
+        with SMTP(SMTP_SERVER, PORT) as server:
+            # Secure the connection
+            server.starttls(context=ssl.create_default_context())
+
+            message = self.create_mail(bearing, date)
+            SENDER_MAIL: str = message['From']
+            with open('modules/pass.txt', 'r') as password_file:
+                PASSWORD: str = password_file.readline()
+            server.login(SENDER_MAIL, PASSWORD)
+
+            RECEIVER_MAIL: str = message['To']
+            server.sendmail(SENDER_MAIL, RECEIVER_MAIL, message.as_string())
+
+    def create_mail(self, bearing: int, date: str):
+        """Create mail with subject and relevant text.
+
+        Args:
+            bearing (int): Bearing type that need to be replaced.
+            date (str): Date by which the bearing must be replaced.
+
+        Returns:
+            MIMEMultipart: Сlass that contains information about e-mail.
+        """
+        message = MIMEMultipart()
+        message['Subject'] = 'Замена подшипника'
+        message['From'] = 'skaratsev@gmail.com'
+        message['To'] = 'DataScienceColab1337@gmail.com'
+
+        text: str = f'{bearing} необходимо заменить до {date}'
+        body_text = MIMEText(text, 'plain')
+        message.attach(body_text)
+
+        return message
 
 
 def internet_connection_fail() -> None:
