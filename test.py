@@ -110,7 +110,7 @@ class AuthorizationWindow(wx.Frame):
             psycopg2.OperationalError: If username or password is invalid.
         """
         connection_string: str = \
-            f'dbname=testdb user={username} password={password}'
+            f'dbname=bearing_db user={username} password={password}'
         try:
             connection: Union[pspg2.extensions.connection,
                               None] = pspg2.connect(connection_string)
@@ -262,19 +262,19 @@ class SelectDataWindow(wx.Dialog):
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
         date_begin_label = wx.StaticText(panel, label='C')
-        date_begin_edit = wx.adv.DatePickerCtrl(panel,
-                                                style=wx.adv.DP_DROPDOWN,
-                                                size=(230, 30))
+        self.date_begin_edit = wx.adv.DatePickerCtrl(panel,
+                                                     style=wx.adv.DP_DROPDOWN,
+                                                     size=(230, 30))
 
         date_end_label = wx.StaticText(panel, label='По')
-        date_end_edit = wx.adv.DatePickerCtrl(panel,
-                                              style=wx.adv.DP_DROPDOWN,
-                                              size=(230, 30))
+        self.date_end_edit = wx.adv.DatePickerCtrl(panel,
+                                                   style=wx.adv.DP_DROPDOWN,
+                                                   size=(230, 30))
 
         flex_grid_sizer.AddMany([(date_begin_label),
-                                 (date_begin_edit, wx.ID_ANY, wx.EXPAND),
+                                 (self.date_begin_edit, wx.ID_ANY, wx.EXPAND),
                                  (date_end_label),
-                                 (date_end_edit, wx.ID_ANY, wx.EXPAND)])
+                                 (self.date_end_edit, wx.ID_ANY, wx.EXPAND)])
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
@@ -284,8 +284,23 @@ class SelectDataWindow(wx.Dialog):
         enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
-
+        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
         panel.SetSizer(box_sizer)
+
+    def on_enter_button_click(self, event):
+        date_begin: str = str(self.date_begin_edit.GetValue()).split()[1]
+        date_end: str = str(self.date_end_edit.GetValue()).split()[1]
+        # print(str(self.date_begin_edit.GetValue()).split()[1:])
+
+        if date_begin == date_end:
+            error_text: str = 'Даты начала и конца прогноза не могут быть равными.\
+            \nЕсли хотите сделать прогноз на 24 часа укажите второй датой\
+            следующий день.'
+            error_message = wx.MessageDialog(None,
+                                             error_text,
+                                             ' ',
+                                             wx.OK | wx.ICON_ERROR)
+            error_message.ShowModal()
 
 
 class CanvasPanel(wx.Panel):
