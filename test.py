@@ -1,4 +1,5 @@
 """Bearing Vibration Prediction Information System"""
+from datetime import date
 from typing import Dict, List, Tuple, Union
 import socket
 import wx
@@ -295,7 +296,18 @@ class SelectDataWindow(wx.Dialog):
         if date_begin == date_end:
             error_text: str = 'Даты начала и конца прогноза не могут быть равными.\
             \nЕсли хотите сделать прогноз на 24 часа укажите второй датой\
-            следующий день.'
+ следующий день.'
+            error_message = wx.MessageDialog(None,
+                                             error_text,
+                                             ' ',
+                                             wx.OK | wx.ICON_ERROR)
+            error_message.ShowModal()
+        # formatting date to PostgreSQL timestamp type
+        date_begin = date(*list(map(int, date_begin.split('.')))[::-1])
+        date_end = date(*list(map(int, date_end.split('.')))[::-1])
+        if date_begin > date_end:
+            error_text: str = 'Дата начала прогноза не может быть раньше\
+ даты окончания прогноза.'
             error_message = wx.MessageDialog(None,
                                              error_text,
                                              ' ',
