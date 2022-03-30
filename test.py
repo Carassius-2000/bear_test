@@ -24,9 +24,9 @@ BEARING_LIST: List[str] = ['Первый подшипник',
                            'Второй подшипник',
                            'Третий подшипник']
 MAX_BEARINGS_VIBRATION: Dict[int, int] = {0: 5, 1: 2, 2: 3}
-BACKGROUND_COLOR: str = '#fff1e6'
-BUTTON_COLOR: str = '#1bc163'
-TEXT_COLOR: str = '#000000'
+BACKGROUND_COLOR: str = '#ffe2b0'
+BUTTON_COLOR: str = '#eab0bb'
+TEXT_COLOR: str = '#000d35'
 
 
 class AuthorizationWindow(wx.Frame):
@@ -143,7 +143,7 @@ class MainWindow(wx.Frame):
     def __init__(self, db_connection=None):
         super().__init__(parent=None,
                          title='Главное окно',
-                         size=(310, 240),
+                         size=(300, 300),
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
@@ -263,11 +263,13 @@ class SelectDataWindow(wx.Dialog):
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
         date_begin_label = wx.StaticText(panel, label='C')
+        date_begin_label.SetForegroundColour(TEXT_COLOR)
         self.date_begin_edit = wx.adv.DatePickerCtrl(panel,
                                                      style=wx.adv.DP_DROPDOWN,
                                                      size=(230, 30))
 
         date_end_label = wx.StaticText(panel, label='По')
+        date_end_label.SetForegroundColour(TEXT_COLOR)
         self.date_end_edit = wx.adv.DatePickerCtrl(panel,
                                                    style=wx.adv.DP_DROPDOWN,
                                                    size=(230, 30))
@@ -452,10 +454,12 @@ class SendMessageWindow(wx.Dialog):
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
 
         change_bearing_label = wx.StaticText(panel, label='Заменить')
+        change_bearing_label.SetForegroundColour(TEXT_COLOR)
         self.bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
         self.bearing_choice.SetSelection(0)
 
         date_label = wx.StaticText(panel, label='До')
+        date_label.SetForegroundColour(TEXT_COLOR)
         self.date_edit = wx.adv.DatePickerCtrl(panel,
                                                style=wx.adv.DP_DROPDOWN,
                                                size=(170, 30))
