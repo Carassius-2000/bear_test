@@ -1,5 +1,5 @@
 """Bearing Vibration Prediction Information System"""
-from datetime import date
+from datetime import datetime, timedelta
 from typing import Dict, List, Tuple, Union
 import socket
 import wx
@@ -149,6 +149,8 @@ class MainWindow(wx.Frame):
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
+        self.connection = db_connection
+
         panel = wx.Panel(self)
         panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
@@ -229,7 +231,10 @@ class MainWindow(wx.Frame):
             event.Veto()
 
     def on_select_button_click(self, event):
-        with SelectDataWindow(self) as select_data_dialog:
+        bearing_type: int = self.bearing_choice.GetCurrentSelection()
+        with SelectDataWindow(self,
+                              self.connection,
+                              bearing_type) as select_data_dialog:
             select_data_dialog.ShowModal()
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
@@ -252,14 +257,15 @@ class MainWindow(wx.Frame):
 
 
 class SelectDataWindow(wx.Dialog):
-    def __init__(self, parent):
+    def __init__(self, parent, db_connection, bearing_type: str):
         super().__init__(parent=parent,
                          title='Выбрать дату прогноза',
                          size=(300, 170),
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
-
+        self.connection = db_connection
+        self.bearing = bearing_type
         panel = wx.Panel(self)
         panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
@@ -298,7 +304,6 @@ class SelectDataWindow(wx.Dialog):
     def on_enter_button_click(self, event):
         date_begin: str = str(self.date_begin_edit.GetValue()).split()[1]
         date_end: str = str(self.date_end_edit.GetValue()).split()[1]
-        # print(str(self.date_begin_edit.GetValue()).split()[1:])
 
         if date_begin == date_end:
             error_text: str = 'Даты начала и конца прогноза не могут быть равными.\
@@ -310,8 +315,8 @@ class SelectDataWindow(wx.Dialog):
                                              wx.OK | wx.ICON_ERROR)
             error_message.ShowModal()
         # formatting date to PostgreSQL timestamp type
-        date_begin = date(*list(map(int, date_begin.split('.')))[::-1])
-        date_end = date(*list(map(int, date_end.split('.')))[::-1])
+        date_begin = datetime(*list(map(int, date_begin.split('.')))[::-1])
+        date_end = datetime(*list(map(int, date_end.split('.')))[::-1])
         if date_begin > date_end:
             error_text: str = 'Дата начала прогноза не может быть раньше\
  даты окончания прогноза.'
@@ -320,6 +325,47 @@ class SelectDataWindow(wx.Dialog):
                                              ' ',
                                              wx.OK | wx.ICON_ERROR)
             error_message.ShowModal()
+        if date_begin < date_end:
+            parameters: Tuple[str] = (date_begin, date_end)
+            if self.bearing == 0:
+                query: str = "SELECT * FROM X1 \
+                    WHERE date_time >= %s AND date_time < %s"
+                column_count: int = 16
+            elif self.bearing == 1:
+                query: str = "SELECT * FROM X2 \
+                    WHERE date_time >= %s AND date_time < %s"
+                column_count = 18
+            elif self.bearing == 2:
+                query: str = "SELECT * FROM X3 \
+                    WHERE date_time >= %s AND date_time < %s"
+                column_count: int = 18
+            with self.connection.cursor() as cursor:
+                cursor.execute(query, parameters)
+                data = cursor.fetchall()
+                data = pd.DataFrame(data=data, columns=[
+                                    'col ' + str(i)
+                                    for i in range(column_count)])
+                data.index = data.iloc[:, 0]
+                data = data.drop(columns=['col 0'], axis=1)
+
+            query_last_date = data.index[-1].to_pydatetime()
+            if date_end - timedelta(minutes=10) > query_last_date:
+                warning_text: str = f'Последние данные есть\
+ за {query_last_date}'
+                warning_message = wx.MessageDialog(
+                    None,
+                    warning_text,
+                    ' ',
+                    wx.OK | wx.ICON_INFORMATION)
+                warning_message.ShowModal()
+            if date_end - timedelta(minutes=10) == query_last_date:
+                information_text: str = 'Данные успешно получены'
+                information_message = wx.MessageDialog(
+                    None,
+                    information_text,
+                    ' ',
+                    wx.OK | wx.ICON_INFORMATION)
+                information_message.ShowModal()
 
 
 class CanvasPanel(wx.Panel):
@@ -577,9 +623,9 @@ if __name__ == '__main__':
     APP_FONT = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
     APP_FONT.SetPointSize(12)
 
-    # authorization_frame = AuthorizationWindow()
-    # authorization_frame.Show()
-    main_frame = MainWindow()
-    main_frame.Show()
+    authorization_frame = AuthorizationWindow()
+    authorization_frame.Show()
+    # main_frame = MainWindow()
+    # main_frame.Show()
 
     app.MainLoop()
