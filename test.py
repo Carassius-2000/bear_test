@@ -331,7 +331,7 @@ class SelectDataWindow(wx.Dialog):
         panel.SetSizer(box_sizer)
 
     def on_enter_button_click(self, event) -> None:
-        """_summary_."""
+        """Select data from DB and send it to Main Window."""
         date_begin: str = str(self.date_begin_edit.GetValue()).split()[1]
         date_end: str = str(self.date_end_edit.GetValue()).split()[1]
 
