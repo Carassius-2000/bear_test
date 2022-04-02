@@ -1,6 +1,6 @@
 """Bearing Vibration Prediction Information System"""
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple
 import socket
 import wx
 import wx.adv
@@ -142,8 +142,16 @@ class AuthorizationWindow(wx.Frame):
 
 
 class MainWindow(wx.Frame):
+    """App main window."""
 
     def __init__(self, connection_pool=None):
+        """Create Main Window.
+
+        Attributes:
+            connection_pool : PostgreSQL connection pool.
+            bearing_choice (wx.Choice): User's bearing choice.
+            predictor_matrix:.
+        """
         super().__init__(parent=None,
                          title='Главное окно',
                          size=(300, 300),
@@ -262,9 +270,21 @@ class MainWindow(wx.Frame):
 
 
 class SelectDataWindow(wx.Dialog):
-    """_summary_."""
+    """Window that allows to choose prediction date."""
 
     def __init__(self, parent, connection_pool, bearing_type: str):
+        """Create Select Data Window.
+
+        Attributes:
+            connection_pool (psycopg2.pool.SimpleConnectionPool):\
+                PostgreSQL connection pool.
+            bearing (str): User's bearing choice.
+            parent : Parent window reference.
+            date_begin_edit (wx.adv.DatePickerCtrl):\
+                Control that contains first prediction date.
+            date_end_edit (wx.adv.DatePickerCtrl):\
+                Control that contains second prediction date.
+        """
         super().__init__(parent=parent,
                          title='Выбрать дату прогноза',
                          size=(300, 170),
@@ -272,7 +292,7 @@ class SelectDataWindow(wx.Dialog):
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
         self.connection_pool = connection_pool
-        self.bearing = bearing_type
+        self.bearing: str = bearing_type
         self.parent = parent
 
         panel = wx.Panel(self)
@@ -310,31 +330,16 @@ class SelectDataWindow(wx.Dialog):
         enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
         panel.SetSizer(box_sizer)
 
-    def on_enter_button_click(self, event):
+    def on_enter_button_click(self, event) -> None:
+        """_summary_."""
         date_begin: str = str(self.date_begin_edit.GetValue()).split()[1]
         date_end: str = str(self.date_end_edit.GetValue()).split()[1]
 
-        if date_begin == date_end:
-            error_text: str = 'Даты начала и конца прогноза не могут быть равными.\
-            \nЕсли хотите сделать прогноз на 24 часа укажите второй датой\
- следующий день.'
-            error_message = wx.MessageDialog(None,
-                                             error_text,
-                                             ' ',
-                                             wx.OK | wx.ICON_ERROR)
-            error_message.ShowModal()
         # formatting date to PostgreSQL timestamp type
         date_begin = datetime(*list(map(int, date_begin.split('.')))[::-1])
         date_end = datetime(*list(map(int, date_end.split('.')))[::-1])
-        if date_begin > date_end:
-            error_text: str = 'Дата начала прогноза не может быть раньше\
- даты окончания прогноза.'
-            error_message = wx.MessageDialog(None,
-                                             error_text,
-                                             ' ',
-                                             wx.OK | wx.ICON_ERROR)
-            error_message.ShowModal()
-        if date_begin < date_end:
+
+        if self.check_date(date_begin, date_end):
             parameters: Tuple[str] = (date_begin, date_end)
             if self.bearing == 0:
                 query: str = "SELECT * FROM X1 \
@@ -352,11 +357,12 @@ class SelectDataWindow(wx.Dialog):
             connection = self.connection_pool.getconn()
             with connection.cursor() as cursor:
                 cursor.execute(query, parameters)
-                data = cursor.fetchall()
-                data = pd.DataFrame(data=data, columns=[
-                                    'col ' + str(i)
-                                    for i in range(column_count)])
-                if data.empty:
+                predictor_matrix = cursor.fetchall()
+                predictor_matrix = pd.DataFrame(
+                    data=predictor_matrix,
+                    columns=['col ' + str(i)
+                             for i in range(column_count)])
+                if predictor_matrix.empty:
                     error_text: str = 'Нет данных на эти даты.'
                     error_message = wx.MessageDialog(None,
                                                      error_text,
@@ -364,10 +370,12 @@ class SelectDataWindow(wx.Dialog):
                                                      wx.OK | wx.ICON_ERROR)
                     error_message.ShowModal()
                 else:
-                    data.index = data.iloc[:, 0]
-                    data = data.drop(columns=['col 0'], axis=1)
+                    predictor_matrix.index = predictor_matrix.iloc[:, 0]
+                    predictor_matrix = predictor_matrix.drop(
+                        columns=['col 0'], axis=1)
 
-                    query_last_date = data.index[-1].to_pydatetime()
+                    query_last_date = predictor_matrix.index[-1]\
+                        .to_pydatetime()
                     if date_end - timedelta(minutes=10) > query_last_date:
                         warning_text: str = f'Последние данные есть\
  за {query_last_date}.'
@@ -385,8 +393,41 @@ class SelectDataWindow(wx.Dialog):
                             ' ',
                             wx.OK | wx.ICON_INFORMATION)
                         information_message.ShowModal()
-                self.parent.predictor_matrix = data
+                self.parent.predictor_matrix = predictor_matrix
                 self.connection_pool.putconn(connection)
+
+    def check_date(self, date_begin, date_end) -> bool:
+        """Check date for validity.
+
+        Args:
+            date_begin (datetime.datetime): First prediction date.
+            date_end (datetime.datetime): Second prediction date.
+
+        Returns:
+            bool: True if all date is valid, False in other cases.
+        """
+        if date_begin == date_end:
+            error_text: str = 'Даты начала и конца прогноза не могут быть равными.\
+            \nЕсли хотите сделать прогноз на 24 часа укажите второй датой\
+ следующий день.'
+            error_message = wx.MessageDialog(None,
+                                             error_text,
+                                             ' ',
+                                             wx.OK | wx.ICON_ERROR)
+            error_message.ShowModal()
+            return False
+
+        elif date_begin > date_end:
+            error_text: str = 'Дата начала прогноза не может быть раньше\
+ даты окончания прогноза.'
+            error_message = wx.MessageDialog(None,
+                                             error_text,
+                                             ' ',
+                                             wx.OK | wx.ICON_ERROR)
+            error_message.ShowModal()
+            return False
+        else:
+            return True
 
 
 class CanvasPanel(wx.Panel):
