@@ -5,6 +5,7 @@ import socket
 import wx
 import wx.adv
 import psycopg2 as pspg2
+from psycopg2 import pool
 import numpy as np
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -98,24 +99,25 @@ class AuthorizationWindow(wx.Frame):
         else:
             event.Veto()
 
-    def get_connection(self, username: str, password: str):
-        """Get PostgreSQL database connection.
+    def get_connection_pool(self, username: str, password: str):
+        """Get PostgreSQL database connection pool.
 
         Args:
             username (str): PostgreSQL user's name.
             password (str): PostgreSQL user's password.
 
         Returns:
-            PostgreSQL connection.
+            PostgreSQL connection pool.
 
         Raises:
             psycopg2.OperationalError: If username or password is invalid.
         """
-        connection_string: str = \
-            f'dbname=bearing_db user={username} password={password}'
         try:
-            connection: Union[pspg2.extensions.connection,
-                              None] = pspg2.connect(connection_string)
+            connection_pool = pool.SimpleConnectionPool(
+                1, 20,
+                user=username,
+                password=password,
+                database='bearing_db')
         except pspg2.OperationalError:
             error_text: str = 'Введен неверный логин или пароль.'
             dialog_message = wx.MessageDialog(self,
@@ -125,23 +127,23 @@ class AuthorizationWindow(wx.Frame):
             dialog_message.ShowModal()
             return
         else:
-            return connection
+            return connection_pool
 
     def on_enter_button_click(self, event) -> None:
         """Enter Information System."""
         login: str = self.login_edit.GetValue()
         password: str = self.password_edit.GetValue()
         if check_internet_connection():
-            connection = self.get_connection(login, password)
-            if connection:
+            connection_pool = self.get_connection_pool(login, password)
+            if connection_pool:
                 self.Destroy()
-                main_frame = MainWindow(db_connection=connection)
+                main_frame = MainWindow(connection_pool=connection_pool)
                 main_frame.Show()
 
 
 class MainWindow(wx.Frame):
 
-    def __init__(self, db_connection=None):
+    def __init__(self, connection_pool=None):
         super().__init__(parent=None,
                          title='Главное окно',
                          size=(300, 300),
@@ -149,7 +151,7 @@ class MainWindow(wx.Frame):
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
 
-        self.connection = db_connection
+        self.connection_pool = connection_pool
 
         panel = wx.Panel(self)
         panel.SetFont(APP_FONT)
@@ -172,7 +174,8 @@ class MainWindow(wx.Frame):
                       border=10)
         select_button.Bind(wx.EVT_BUTTON, self.on_select_button_click)
 
-        # self.df = None
+        self.predictor_matrix = None
+
         y = np.arange(1, 11)
         y_mn = y - 1
         y_mx = y + 1
@@ -226,6 +229,7 @@ class MainWindow(wx.Frame):
         result = dialog_message.ShowModal()
 
         if result == wx.ID_YES:
+            self.connection_pool.closeall
             self.Destroy()
         else:
             event.Veto()
@@ -233,9 +237,10 @@ class MainWindow(wx.Frame):
     def on_select_button_click(self, event):
         bearing_type: int = self.bearing_choice.GetCurrentSelection()
         with SelectDataWindow(self,
-                              self.connection,
+                              self.connection_pool,
                               bearing_type) as select_data_dialog:
             select_data_dialog.ShowModal()
+            print(self.X)
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
@@ -257,15 +262,19 @@ class MainWindow(wx.Frame):
 
 
 class SelectDataWindow(wx.Dialog):
-    def __init__(self, parent, db_connection, bearing_type: str):
+    """_summary_."""
+
+    def __init__(self, parent, connection_pool, bearing_type: str):
         super().__init__(parent=parent,
                          title='Выбрать дату прогноза',
                          size=(300, 170),
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
-        self.connection = db_connection
+        self.connection_pool = connection_pool
         self.bearing = bearing_type
+        self.parent = parent
+
         panel = wx.Panel(self)
         panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
@@ -339,33 +348,45 @@ class SelectDataWindow(wx.Dialog):
                 query: str = "SELECT * FROM X3 \
                     WHERE date_time >= %s AND date_time < %s"
                 column_count: int = 18
-            with self.connection.cursor() as cursor:
+
+            connection = self.connection_pool.getconn()
+            with connection.cursor() as cursor:
                 cursor.execute(query, parameters)
                 data = cursor.fetchall()
                 data = pd.DataFrame(data=data, columns=[
                                     'col ' + str(i)
                                     for i in range(column_count)])
-                data.index = data.iloc[:, 0]
-                data = data.drop(columns=['col 0'], axis=1)
+                if data.empty:
+                    error_text: str = 'Нет данных на эти даты.'
+                    error_message = wx.MessageDialog(None,
+                                                     error_text,
+                                                     ' ',
+                                                     wx.OK | wx.ICON_ERROR)
+                    error_message.ShowModal()
+                else:
+                    data.index = data.iloc[:, 0]
+                    data = data.drop(columns=['col 0'], axis=1)
 
-            query_last_date = data.index[-1].to_pydatetime()
-            if date_end - timedelta(minutes=10) > query_last_date:
-                warning_text: str = f'Последние данные есть\
- за {query_last_date}'
-                warning_message = wx.MessageDialog(
-                    None,
-                    warning_text,
-                    ' ',
-                    wx.OK | wx.ICON_INFORMATION)
-                warning_message.ShowModal()
-            if date_end - timedelta(minutes=10) == query_last_date:
-                information_text: str = 'Данные успешно получены'
-                information_message = wx.MessageDialog(
-                    None,
-                    information_text,
-                    ' ',
-                    wx.OK | wx.ICON_INFORMATION)
-                information_message.ShowModal()
+                    query_last_date = data.index[-1].to_pydatetime()
+                    if date_end - timedelta(minutes=10) > query_last_date:
+                        warning_text: str = f'Последние данные есть\
+ за {query_last_date}.'
+                        warning_message = wx.MessageDialog(
+                            None,
+                            warning_text,
+                            ' ',
+                            wx.OK | wx.ICON_INFORMATION)
+                        warning_message.ShowModal()
+                    elif date_end - timedelta(minutes=10) == query_last_date:
+                        information_text: str = 'Данные успешно получены'
+                        information_message = wx.MessageDialog(
+                            None,
+                            information_text,
+                            ' ',
+                            wx.OK | wx.ICON_INFORMATION)
+                        information_message.ShowModal()
+                self.parent.predictor_matrix = data
+                self.connection_pool.putconn(connection)
 
 
 class CanvasPanel(wx.Panel):
