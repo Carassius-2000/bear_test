@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 import socket
+from sympy import im
 import wx
 import wx.adv
 import psycopg2 as pspg2
@@ -13,6 +14,7 @@ from smtplib import SMTP
 import ssl
 import matplotlib
 import pandas as pd
+import joblib
 from matplotlib.backends.backend_wxagg import (
     NavigationToolbar2WxAgg as NavigationToolbar,
     FigureCanvasWxAgg as FigureCanvas)
@@ -244,7 +246,7 @@ class MainWindow(wx.Frame):
                               self.connection_pool,
                               bearing_type) as select_data_dialog:
             select_data_dialog.ShowModal()
-            print(self.X)
+            print(self.predictor_matrix)
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
@@ -343,7 +345,7 @@ class SelectDataWindow(wx.Dialog):
             elif self.bearing == 1:
                 query: str = "SELECT * FROM X2 \
                     WHERE date_time >= %s AND date_time < %s"
-                column_count = 18
+                column_count: int = 18
             elif self.bearing == 2:
                 query: str = "SELECT * FROM X3 \
                     WHERE date_time >= %s AND date_time < %s"
@@ -388,6 +390,16 @@ class SelectDataWindow(wx.Dialog):
                             ' ',
                             wx.OK | wx.ICON_INFORMATION)
                         information_message.ShowModal()
+
+                    if self.bearing == 0:
+                        scaler = joblib.load(r'scalers\scaler1st.model')
+                    elif self.bearing == 1:
+                        scaler = joblib.load(r'scalers\scaler2st.model')
+                    elif self.bearing == 2:
+                        scaler = joblib.load(r'scalers\scaler3st.model')
+                predictor_matrix = pd.DataFrame(
+                    data=scaler.transform(predictor_matrix),
+                    columns=predictor_matrix.columns)
                 self.parent.predictor_matrix = predictor_matrix
                 self.connection_pool.putconn(connection)
 
