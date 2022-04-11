@@ -76,7 +76,6 @@ class AuthorizationWindow(wx.Frame):
         enter_button = wx.Button(panel, label='Войти')
         enter_button.SetForegroundColour(TEXT_COLOR)
         enter_button.SetBackgroundColour(BUTTON_COLOR)
-        enter_button.SetWindowStyleFlag(wx.BORDER_NONE)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
         enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
@@ -148,7 +147,8 @@ class MainWindow(wx.Frame):
         """Create Main Window.
 
         Attributes:
-            connection_pool : PostgreSQL connection pool.
+            connection_pool (psycopg2.pool.SimpleConnectionPool):\
+                PostgreSQL connection pool.
             bearing_choice (wx.Choice): User's bearing choice.
             predictor_matrix:.
         """
@@ -175,7 +175,6 @@ class MainWindow(wx.Frame):
         select_button = wx.Button(panel, label='Выбрать дату прогноза')
         select_button.SetForegroundColour(TEXT_COLOR)
         select_button.SetBackgroundColour(BUTTON_COLOR)
-        select_button.SetWindowStyleFlag(wx.BORDER_NONE)
         box_sizer.Add(select_button,
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
@@ -195,7 +194,6 @@ class MainWindow(wx.Frame):
         visualization_button = wx.Button(panel, label='Визуализация процесса')
         visualization_button.SetForegroundColour(TEXT_COLOR)
         visualization_button.SetBackgroundColour(BUTTON_COLOR)
-        visualization_button.SetWindowStyleFlag(wx.BORDER_NONE)
         box_sizer.Add(visualization_button,
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
@@ -206,7 +204,6 @@ class MainWindow(wx.Frame):
         send_message_button = wx.Button(panel, label='Отправить сообщение')
         send_message_button.SetForegroundColour(TEXT_COLOR)
         send_message_button.SetBackgroundColour(BUTTON_COLOR)
-        send_message_button.SetWindowStyleFlag(wx.BORDER_NONE)
         box_sizer.Add(send_message_button,
                       flag=wx.EXPAND
                       | wx.LEFT | wx.RIGHT | wx.BOTTOM,
@@ -217,7 +214,6 @@ class MainWindow(wx.Frame):
         save_prediction_button = wx.Button(panel, label='Записать прогноз')
         save_prediction_button.SetForegroundColour(TEXT_COLOR)
         save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
-        save_prediction_button.SetWindowStyleFlag(wx.BORDER_NONE)
         box_sizer.Add(save_prediction_button,
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
@@ -324,7 +320,6 @@ class SelectDataWindow(wx.Dialog):
         enter_button = wx.Button(panel, label='Спрогнозировать')
         enter_button.SetForegroundColour(TEXT_COLOR)
         enter_button.SetBackgroundColour(BUTTON_COLOR)
-        enter_button.SetWindowStyleFlag(wx.BORDER_NONE)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
         enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
@@ -589,7 +584,6 @@ class SendMessageWindow(wx.Dialog):
         enter_button = wx.Button(panel, label='Отправить')
         enter_button.SetForegroundColour(TEXT_COLOR)
         enter_button.SetBackgroundColour(BUTTON_COLOR)
-        enter_button.SetWindowStyleFlag(wx.BORDER_NONE)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
         enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
