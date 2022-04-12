@@ -80,8 +80,8 @@ class AuthorizationWindow(wx.Frame):
         enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
-        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
 
+        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
         panel.SetSizer(box_sizer)
 
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
@@ -195,6 +195,7 @@ class MainWindow(wx.Frame):
 
         visualization_button = buttons.GenButton(
             panel, label='Визуализация процесса')
+
         visualization_button.SetForegroundColour(TEXT_COLOR)
         visualization_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(visualization_button,
@@ -229,6 +230,7 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
 
     def on_close_window(self, event) -> None:
+        """Close Authorization Window."""
         question: str = 'Вы действительно хотите выйти из приложения?'
         dialog_message = wx.MessageDialog(self,
                                           question,
@@ -694,9 +696,9 @@ if __name__ == '__main__':
     APP_FONT = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
     APP_FONT.SetPointSize(12)
 
-    authorization_frame = AuthorizationWindow()
-    authorization_frame.Show()
-    # main_frame = MainWindow()
-    # main_frame.Show()
+    # authorization_frame = AuthorizationWindow()
+    # authorization_frame.Show()
+    main_frame = MainWindow()
+    main_frame.Show()
 
     app.MainLoop()
