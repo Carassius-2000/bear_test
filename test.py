@@ -80,8 +80,8 @@ class AuthorizationWindow(wx.Frame):
         enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
                       flag=wx.EXPAND | wx.LEFT | wx.RIGHT, border=10)
-        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
 
+        enter_button.Bind(wx.EVT_BUTTON, self.on_enter_button_click)
         panel.SetSizer(box_sizer)
 
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
@@ -181,6 +181,7 @@ class MainWindow(wx.Frame):
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
+        select_button.Bind(wx.EVT_CHAR_HOOK, self.key_pressed)
         select_button.Bind(wx.EVT_BUTTON, self.on_select_button_click)
 
         self.predictor_matrix = None
@@ -229,6 +230,7 @@ class MainWindow(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
 
     def on_close_window(self, event) -> None:
+        """Close Authorization Window."""
         question: str = 'Вы действительно хотите выйти из приложения?'
         dialog_message = wx.MessageDialog(self,
                                           question,
