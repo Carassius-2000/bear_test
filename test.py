@@ -2,9 +2,9 @@
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 import socket
-from sympy import im
 import wx
 import wx.adv
+from wx.lib import buttons
 import psycopg2 as pspg2
 from psycopg2 import pool
 import numpy as np
@@ -75,7 +75,7 @@ class AuthorizationWindow(wx.Frame):
         box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
-        enter_button = wx.Button(panel, label='Войти')
+        enter_button = buttons.GenButton(panel, label='Войти')
         enter_button.SetForegroundColour(TEXT_COLOR)
         enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
@@ -174,7 +174,7 @@ class MainWindow(wx.Frame):
         box_sizer.Add(self.bearing_choice,
                       flag=wx.EXPAND | wx.ALL, border=10)
 
-        select_button = wx.Button(panel, label='Выбрать дату прогноза')
+        select_button = buttons.GenButton(panel, label='Выбрать дату прогноза')
         select_button.SetForegroundColour(TEXT_COLOR)
         select_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(select_button,
@@ -193,7 +193,8 @@ class MainWindow(wx.Frame):
                                 'val_max': y_mx,
                                 'val_min': y_mn})
 
-        visualization_button = wx.Button(panel, label='Визуализация процесса')
+        visualization_button = buttons.GenButton(
+            panel, label='Визуализация процесса')
         visualization_button.SetForegroundColour(TEXT_COLOR)
         visualization_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(visualization_button,
@@ -203,7 +204,8 @@ class MainWindow(wx.Frame):
         visualization_button.Bind(wx.EVT_BUTTON,
                                   self.on_visualization_button_click)
 
-        send_message_button = wx.Button(panel, label='Отправить сообщение')
+        send_message_button = buttons.GenButton(
+            panel, label='Отправить сообщение')
         send_message_button.SetForegroundColour(TEXT_COLOR)
         send_message_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(send_message_button,
@@ -213,7 +215,8 @@ class MainWindow(wx.Frame):
         send_message_button.Bind(
             wx.EVT_BUTTON, self.on_send_message_button_click)
 
-        save_prediction_button = wx.Button(panel, label='Записать прогноз')
+        save_prediction_button = buttons.GenButton(
+            panel, label='Записать прогноз')
         save_prediction_button.SetForegroundColour(TEXT_COLOR)
         save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(save_prediction_button,
@@ -225,7 +228,7 @@ class MainWindow(wx.Frame):
 
         self.Bind(wx.EVT_CLOSE, self.on_close_window)
 
-    def on_close_window(self, event):
+    def on_close_window(self, event) -> None:
         question: str = 'Вы действительно хотите выйти из приложения?'
         dialog_message = wx.MessageDialog(self,
                                           question,
@@ -240,7 +243,7 @@ class MainWindow(wx.Frame):
         else:
             event.Veto()
 
-    def on_select_button_click(self, event):
+    def on_select_button_click(self, event) -> None:
         bearing_type: int = self.bearing_choice.GetCurrentSelection()
         with SelectDataWindow(self,
                               self.connection_pool,
@@ -262,7 +265,7 @@ class MainWindow(wx.Frame):
         with PlotWindow(self, self.df, bearing_type) as plot_window_dialog:
             plot_window_dialog.ShowModal()
 
-    def on_send_message_button_click(self, event):
+    def on_send_message_button_click(self, event) -> None:
         with SendMessageWindow(self) as send_message_dialog:
             send_message_dialog.ShowModal()
 
@@ -319,7 +322,7 @@ class SelectDataWindow(wx.Dialog):
         box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
-        enter_button = wx.Button(panel, label='Спрогнозировать')
+        enter_button = buttons.GenButton(panel, label='Спрогнозировать')
         enter_button.SetForegroundColour(TEXT_COLOR)
         enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
@@ -593,7 +596,7 @@ class SendMessageWindow(wx.Dialog):
         box_sizer = wx.BoxSizer(wx.VERTICAL)
         box_sizer.Add(flex_grid_sizer, flag=wx.EXPAND | wx.ALL, border=10)
 
-        enter_button = wx.Button(panel, label='Отправить')
+        enter_button = buttons.GenButton(panel, label='Отправить')
         enter_button.SetForegroundColour(TEXT_COLOR)
         enter_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(enter_button,
