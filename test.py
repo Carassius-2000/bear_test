@@ -193,17 +193,17 @@ class MainWindow(wx.Frame):
                                 'val_max': y_mx,
                                 'val_min': y_mn})
 
-        visualization_button = buttons.GenButton(
+        self.visualization_button = buttons.GenButton(
             panel, label='Визуализация процесса')
-
-        visualization_button.SetForegroundColour(TEXT_COLOR)
-        visualization_button.SetBackgroundColour(BUTTON_COLOR)
-        box_sizer.Add(visualization_button,
+        self.visualization_button.Enable(False)
+        self.visualization_button.SetForegroundColour(TEXT_COLOR)
+        self.visualization_button.SetBackgroundColour(BUTTON_COLOR)
+        box_sizer.Add(self.visualization_button,
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
-        visualization_button.Bind(wx.EVT_BUTTON,
-                                  self.on_visualization_button_click)
+        self.visualization_button.Bind(wx.EVT_BUTTON,
+                                       self.on_visualization_button_click)
 
         send_message_button = buttons.GenButton(
             panel, label='Отправить сообщение')
@@ -218,6 +218,7 @@ class MainWindow(wx.Frame):
 
         save_prediction_button = buttons.GenButton(
             panel, label='Записать прогноз')
+        save_prediction_button.Enable(False)
         save_prediction_button.SetForegroundColour(TEXT_COLOR)
         save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
         box_sizer.Add(save_prediction_button,
@@ -252,6 +253,7 @@ class MainWindow(wx.Frame):
                               bearing_type) as select_data_dialog:
             select_data_dialog.ShowModal()
             print(self.predictor_matrix)
+        self.visualization_button.Enable(True)
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
@@ -696,9 +698,9 @@ if __name__ == '__main__':
     APP_FONT = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
     APP_FONT.SetPointSize(12)
 
-    # authorization_frame = AuthorizationWindow()
-    # authorization_frame.Show()
-    main_frame = MainWindow()
-    main_frame.Show()
+    authorization_frame = AuthorizationWindow()
+    authorization_frame.Show()
+    # main_frame = MainWindow()
+    # main_frame.Show()
 
     app.MainLoop()
