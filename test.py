@@ -216,12 +216,12 @@ class MainWindow(wx.Frame):
         send_message_button.Bind(
             wx.EVT_BUTTON, self.on_send_message_button_click)
 
-        save_prediction_button = buttons.GenButton(
+        self.save_prediction_button = buttons.GenButton(
             panel, label='Записать прогноз')
-        save_prediction_button.Enable(False)
-        save_prediction_button.SetForegroundColour(TEXT_COLOR)
-        save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
-        box_sizer.Add(save_prediction_button,
+        self.save_prediction_button.Enable(False)
+        self.save_prediction_button.SetForegroundColour(TEXT_COLOR)
+        self.save_prediction_button.SetBackgroundColour(BUTTON_COLOR)
+        box_sizer.Add(self.save_prediction_button,
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
@@ -253,7 +253,9 @@ class MainWindow(wx.Frame):
                               bearing_type) as select_data_dialog:
             select_data_dialog.ShowModal()
             print(self.predictor_matrix)
-        self.visualization_button.Enable(True)
+        if self.predictor_matrix is None:
+            self.visualization_button.Enable(True)
+            self.save_prediction_button.Enable(True)
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
