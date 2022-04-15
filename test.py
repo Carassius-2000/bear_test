@@ -169,11 +169,6 @@ class MainWindow(wx.Frame):
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        self.bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
-        self.bearing_choice.SetSelection(0)
-        box_sizer.Add(self.bearing_choice,
-                      flag=wx.EXPAND | wx.ALL, border=10)
-
         select_button = buttons.GenButton(panel, label='Выбрать дату прогноза')
         select_button.SetForegroundColour(TEXT_COLOR)
         select_button.SetBackgroundColour(BUTTON_COLOR)
@@ -183,6 +178,7 @@ class MainWindow(wx.Frame):
                       border=10)
         select_button.Bind(wx.EVT_BUTTON, self.on_select_button_click)
 
+        self.bearing_type: int = -1
         self.predictor_matrix = None
 
         y = np.arange(1, 11)
@@ -247,13 +243,14 @@ class MainWindow(wx.Frame):
             event.Veto()
 
     def on_select_button_click(self, event) -> None:
-        bearing_type: int = self.bearing_choice.GetCurrentSelection()
+        """Open Select Data Window."""
+        # bearing_type: int = self.bearing_choice.GetCurrentSelection()
         with SelectDataWindow(self,
-                              self.connection_pool,
-                              bearing_type) as select_data_dialog:
+                              self.connection_pool) as select_data_dialog:
             select_data_dialog.ShowModal()
             print(self.predictor_matrix)
-        if self.predictor_matrix is None:
+            print(f'Выбранный подшипник {self.bearing_type}')
+        if self.predictor_matrix is not None:
             self.visualization_button.Enable(True)
             self.save_prediction_button.Enable(True)
 
@@ -267,11 +264,13 @@ class MainWindow(wx.Frame):
         return yr_min, yr_max
 
     def on_visualization_button_click(self, event) -> None:
+        """Open Plot Window."""
         bearing_type: int = self.bearing_choice.GetCurrentSelection()
         with PlotWindow(self, self.df, bearing_type) as plot_window_dialog:
             plot_window_dialog.ShowModal()
 
     def on_send_message_button_click(self, event) -> None:
+        """Open Send Message Window."""
         with SendMessageWindow(self) as send_message_dialog:
             send_message_dialog.ShowModal()
 
@@ -279,7 +278,7 @@ class MainWindow(wx.Frame):
 class SelectDataWindow(wx.Dialog):
     """Window that allows to choose prediction date."""
 
-    def __init__(self, parent, connection_pool, bearing_type: str):
+    def __init__(self, parent, connection_pool):
         """Create Select Data Window.
 
         Attributes:
@@ -294,19 +293,23 @@ class SelectDataWindow(wx.Dialog):
         """
         super().__init__(parent=parent,
                          title='Выбрать дату прогноза',
-                         size=(300, 170),
+                         size=(300, 220),
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
         self.connection_pool = connection_pool
-        self.bearing: str = bearing_type
         self.parent = parent
 
         panel = wx.Panel(self)
         panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
 
-        flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
+        flex_grid_sizer = wx.FlexGridSizer(3, 2, 10, 10)
+
+        bearing_label = wx.StaticText(panel, label='Для')
+        bearing_label.SetForegroundColour(TEXT_COLOR)
+        self.bearing_choice = wx.Choice(panel, choices=BEARING_LIST)
+        self.bearing_choice.SetSelection(0)
 
         date_begin_label = wx.StaticText(panel, label='C')
         date_begin_label.SetForegroundColour(TEXT_COLOR)
@@ -320,7 +323,9 @@ class SelectDataWindow(wx.Dialog):
                                                    style=wx.adv.DP_DROPDOWN,
                                                    size=(230, 30))
 
-        flex_grid_sizer.AddMany([(date_begin_label),
+        flex_grid_sizer.AddMany([(bearing_label),
+                                 (self.bearing_choice, wx.ID_ANY, wx.EXPAND),
+                                 (date_begin_label),
                                  (self.date_begin_edit, wx.ID_ANY, wx.EXPAND),
                                  (date_end_label),
                                  (self.date_end_edit, wx.ID_ANY, wx.EXPAND)])
@@ -345,17 +350,19 @@ class SelectDataWindow(wx.Dialog):
         date_begin = datetime(*list(map(int, date_begin.split('.')))[::-1])
         date_end = datetime(*list(map(int, date_end.split('.')))[::-1])
 
+        bearing: int = self.bearing_choice.GetCurrentSelection()
+
         if self.check_date(date_begin, date_end):
             parameters: Tuple[str] = (date_begin, date_end)
-            if self.bearing == 0:
+            if bearing == 0:
                 query: str = "SELECT * FROM X1 \
                     WHERE date_time >= %s AND date_time < %s"
                 column_count: int = 16
-            elif self.bearing == 1:
+            elif bearing == 1:
                 query: str = "SELECT * FROM X2 \
                     WHERE date_time >= %s AND date_time < %s"
                 column_count: int = 18
-            elif self.bearing == 2:
+            elif bearing == 2:
                 query: str = "SELECT * FROM X3 \
                     WHERE date_time >= %s AND date_time < %s"
                 column_count: int = 18
@@ -400,15 +407,16 @@ class SelectDataWindow(wx.Dialog):
                             wx.OK | wx.ICON_INFORMATION)
                         information_message.ShowModal()
 
-                    if self.bearing == 0:
+                    if bearing == 0:
                         scaler = joblib.load(r'scalers\scaler1st.model')
-                    elif self.bearing == 1:
+                    elif bearing == 1:
                         scaler = joblib.load(r'scalers\scaler2st.model')
-                    elif self.bearing == 2:
+                    elif bearing == 2:
                         scaler = joblib.load(r'scalers\scaler3st.model')
                 predictor_matrix = pd.DataFrame(
                     data=scaler.transform(predictor_matrix),
                     columns=predictor_matrix.columns)
+                self.parent.bearing_type = bearing
                 self.parent.predictor_matrix = predictor_matrix
                 self.connection_pool.putconn(connection)
 
