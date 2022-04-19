@@ -26,7 +26,7 @@ matplotlib.use('WXAgg')
 BEARING_LIST: List[str] = ['Первый подшипник',
                            'Второй подшипник',
                            'Третий подшипник']
-MAX_BEARINGS_VIBRATION: Dict[int, int] = {0: 5, 1: 2, 2: 3}
+MAX_BEARINGS_VIBRATION: Dict[int, int] = {0: 96, 1: 33, 2: 52}
 BACKGROUND_COLOR: str = '#ffe2b0'
 BUTTON_COLOR: str = '#eab0bb'
 TEXT_COLOR: str = '#000d35'
@@ -180,14 +180,7 @@ class MainWindow(wx.Frame):
 
         self.bearing_type: int = -1
         self.predictor_matrix = None
-
-        y = np.arange(1, 11)
-        y_mn = y - 1
-        y_mx = y + 1
-        self.df = pd.DataFrame({'date': np.arange(1, len(y) + 1),
-                                'val': y,
-                                'val_max': y_mx,
-                                'val_min': y_mn})
+        self.predictions = None
 
         self.visualization_button = buttons.GenButton(
             panel, label='Визуализация процесса')
@@ -248,11 +241,27 @@ class MainWindow(wx.Frame):
         with SelectDataWindow(self,
                               self.connection_pool) as select_data_dialog:
             select_data_dialog.ShowModal()
-            print(self.predictor_matrix)
-            print(f'Выбранный подшипник {self.bearing_type}')
         if self.predictor_matrix is not None:
+            # Enable buttons
             self.visualization_button.Enable(True)
             self.save_prediction_button.Enable(True)
+            # Make predictions
+            if self.bearing_type == 0:
+                model = joblib.load(r'models\final_model_1st.model')
+            elif self.bearing_type == 1:
+                model = joblib.load(r'models\final_model_2st.model')
+            elif self.bearing_type == 2:
+                model = joblib.load(r'models\final_model_3st.model')
+            forecast_values = model.predict(self.predictor_matrix)
+        # print(self.forecast_values)
+        min_forecast_values, max_forecast_values = self.prediction_intervals(
+            forecast_values)
+        self.predictions = pd.DataFrame(
+            {'date': np.arange(1, len(forecast_values) + 1),
+             'value': forecast_values,
+             'max_value': max_forecast_values,
+             'min_value': min_forecast_values}
+        )
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
@@ -265,8 +274,9 @@ class MainWindow(wx.Frame):
 
     def on_visualization_button_click(self, event) -> None:
         """Open Plot Window."""
-        bearing_type: int = self.bearing_choice.GetCurrentSelection()
-        with PlotWindow(self, self.df, bearing_type) as plot_window_dialog:
+        with PlotWindow(self,
+                        self.predictions,
+                        self.bearing_type) as plot_window_dialog:
             plot_window_dialog.ShowModal()
 
     def on_send_message_button_click(self, event) -> None:
@@ -485,53 +495,53 @@ class CanvasPanel(wx.Panel):
         self.Fit()
 
     def get_outliers(self,
-                     pandas_data_frame: pd.core.frame.DataFrame,
+                     predictions: pd.core.frame.DataFrame,
                      bearing_type: int) -> pd.core.frame.DataFrame:
         """Get outliers DataFrame.
 
         Args:
-            pandas_data_frame (pd.core.frame.DataFrame):\
+            predictions (pd.core.frame.DataFrame):\
             DataFrame that contain fitted values with prediction interval.
             bearing_type (int): Need to determine the limit value of vibration.
 
         Returns:
             pd.core.frame.DataFrame: DataFrame that contain outliers.
         """
-        condition: bool = pandas_data_frame['val'] > MAX_BEARINGS_VIBRATION[
+        condition: bool = predictions['value'] > MAX_BEARINGS_VIBRATION[
             bearing_type]
-        df_out = pd.DataFrame({'val': pandas_data_frame[condition].val,
-                               'date': pandas_data_frame[condition].date})
-        return df_out
+        outliers = pd.DataFrame({'value': predictions[condition].value,
+                                 'date': predictions[condition].date})
+        return outliers
 
     def show_plot(self,
-                  pandas_data_frame: pd.core.frame.DataFrame,
+                  predictions: pd.core.frame.DataFrame,
                   bearing_type: int) -> None:
         """Show plot with predictions.
 
         Args:
-            pandas_data_frame (pd.core.frame.DataFrame):\
+            predictions (pd.core.frame.DataFrame):\
             DataFrame that contain fitted values with prediction interval.
             bearing_type (int): Need to determine the limit value of vibration.
         """
         bearing_name: str = BEARING_LIST[bearing_type]
-        self.axes.plot(pandas_data_frame['date'], pandas_data_frame['val'],
+        self.axes.plot(predictions['date'], predictions['value'],
                        label='Прогнозные значения', color='blue')
-        self.axes.plot(pandas_data_frame['date'], pandas_data_frame['val_min'],
+        self.axes.plot(predictions['date'], predictions['min_value'],
                        linestyle='--', color='cyan',
                        label='Минимальные прогнозные значения')
-        self.axes.plot(pandas_data_frame['date'], pandas_data_frame['val_max'],
+        self.axes.plot(predictions['date'], predictions['max_value'],
                        linestyle='--', color='orange',
                        label='Максимальные прогнозные значения')
 
-        outlier_data_frame = self.get_outliers(pandas_data_frame,
-                                               bearing_type=bearing_type)
-        if not outlier_data_frame.empty:
-            self.axes.plot(outlier_data_frame.date,
-                           outlier_data_frame.val,
+        outliers = self.get_outliers(predictions,
+                                     bearing_type=bearing_type)
+        if not outliers.empty:
+            self.axes.plot(outliers.date,
+                           outliers.value,
                            linestyle='', marker='o',
                            color='red', label='Аномальные значения')
         self.axes.set_title(f'{bearing_name}', fontsize=12)
-        self.axes.set_xlabel('Время', fontsize=12)
+        self.axes.set_xlabel('Время (10 мин)', fontsize=12)
         self.axes.set_ylabel('Вибрация (мкм)', fontsize=12)
         self.axes.legend(loc='best', shadow=True, fontsize=12)
 
@@ -540,7 +550,7 @@ class PlotWindow(wx.Dialog):
     """Window that shows bearing vibration plot."""
 
     def __init__(self, parent,
-                 pandas_data_frame: pd.core.frame.DataFrame,
+                 predictions: pd.core.frame.DataFrame,
                  bearing_type: int):
         """Create Plot Window.
 
@@ -560,7 +570,7 @@ class PlotWindow(wx.Dialog):
 
         self.panel = CanvasPanel(self)
 
-        self.panel.show_plot(pandas_data_frame, bearing_type)
+        self.panel.show_plot(predictions, bearing_type)
 
 
 class SendMessageWindow(wx.Dialog):
