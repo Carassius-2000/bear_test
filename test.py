@@ -151,8 +151,11 @@ class MainWindow(wx.Frame):
         Attributes:
             connection_pool (psycopg2.pool.SimpleConnectionPool):\
                 PostgreSQL connection pool.
-            bearing_choice (wx.Choice): User's bearing choice.
-            predictor_matrix:.
+            bearing_type (int): User's bearing choice.
+            predictor_matrix (pd.DataFrame):\
+                DataFrame that stores input data for models.
+            predictions (pd.DataFrame):\
+                DataFrame that stores fitted values with confidence coridor.
         """
         super().__init__(parent=None,
                          title='Главное окно',
@@ -286,6 +289,7 @@ class MainWindow(wx.Frame):
             send_message_dialog.ShowModal()
 
     def on_save_prediction_button_click(self, event) -> None:
+        """Save predictions to database."""
         if check_internet_connection():
             connection = self.connection_pool.getconn()
             with connection.cursor() as cursor:
@@ -526,7 +530,7 @@ class CanvasPanel(wx.Panel):
         self.Fit()
 
     def get_outliers(self,
-                     predictions: Any,
+                     predictions,
                      bearing_type: int) -> Any:
         """Get outliers DataFrame.
 
@@ -582,7 +586,7 @@ class PlotWindow(wx.Dialog):
     """Window that shows bearing vibration plot."""
 
     def __init__(self, parent,
-                 predictions: pd.core.frame.DataFrame,
+                 predictions,
                  bearing_type: int):
         """Create Plot Window.
 
@@ -752,7 +756,5 @@ if __name__ == '__main__':
 
     authorization_frame = AuthorizationWindow()
     authorization_frame.Show()
-    # main_frame = MainWindow()
-    # main_frame.Show()
 
     app.MainLoop()
