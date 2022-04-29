@@ -253,15 +253,14 @@ class MainWindow(wx.Frame):
             elif self.bearing_type == 2:
                 model = joblib.load(r'models\final_model_3st.model')
             forecast_values = model.predict(self.predictor_matrix)
-        # print(self.forecast_values)
-        min_forecast_values, max_forecast_values = self.prediction_intervals(
-            forecast_values)
-        self.predictions = pd.DataFrame(
-            {'date': np.arange(1, len(forecast_values) + 1),
+
+            min_forecast_values, max_forecast_values = self.\
+                prediction_intervals(forecast_values)
+            self.predictions = pd.DataFrame(
+            {'date': self.predictor_matrix.index,
              'value': forecast_values,
              'max_value': max_forecast_values,
-             'min_value': min_forecast_values}
-        )
+             'min_value': min_forecast_values})
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
@@ -425,7 +424,8 @@ class SelectDataWindow(wx.Dialog):
                         scaler = joblib.load(r'scalers\scaler3st.model')
                 predictor_matrix = pd.DataFrame(
                     data=scaler.transform(predictor_matrix),
-                    columns=predictor_matrix.columns)
+                    columns=predictor_matrix.columns,
+                    index=predictor_matrix.index)
                 self.parent.bearing_type = bearing
                 self.parent.predictor_matrix = predictor_matrix
                 self.connection_pool.putconn(connection)
