@@ -1,6 +1,6 @@
 """Bearing Vibration Prediction Information System"""
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 import socket
 import wx
 import wx.adv
@@ -156,7 +156,7 @@ class MainWindow(wx.Frame):
         """
         super().__init__(parent=None,
                          title='Главное окно',
-                         size=(300, 300),
+                         size=(300, 220),
                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU
                          | wx.CAPTION | wx.CLOSE_BOX)
         self.Center()
@@ -214,6 +214,8 @@ class MainWindow(wx.Frame):
                       flag=wx.EXPAND |
                       wx.LEFT | wx.RIGHT | wx.BOTTOM,
                       border=10)
+        self.save_prediction_button.Bind(
+            wx.EVT_BUTTON, self.on_save_prediction_button_click)
 
         panel.SetSizer(box_sizer)
 
@@ -257,10 +259,10 @@ class MainWindow(wx.Frame):
             min_forecast_values, max_forecast_values = self.\
                 prediction_intervals(forecast_values)
             self.predictions = pd.DataFrame(
-            {'date': self.predictor_matrix.index,
-             'value': forecast_values,
-             'max_value': max_forecast_values,
-             'min_value': min_forecast_values})
+                {'date': self.predictor_matrix.index,
+                 'value': forecast_values,
+                 'max_value': max_forecast_values,
+                 'min_value': min_forecast_values})
 
     def prediction_intervals(self, y_r: np.ndarray) -> Tuple[
             np.ndarray, np.ndarray]:
@@ -282,6 +284,35 @@ class MainWindow(wx.Frame):
         """Open Send Message Window."""
         with SendMessageWindow(self) as send_message_dialog:
             send_message_dialog.ShowModal()
+
+    def on_save_prediction_button_click(self, event) -> None:
+        if check_internet_connection():
+            connection = self.connection_pool.getconn()
+            with connection.cursor() as cursor:
+                query: str = "WITH current_bearing AS\
+                        (SELECT bearing_id\
+                        FROM running_bearings\
+                        WHERE \"type\" = %s)\
+                        INSERT INTO report (date, bearing_id, prediction)\
+                        SELECT %s,\
+                        (SELECT * from current_bearing) AS bearing_id,\
+                        %s"
+                current_date = datetime.today()
+                report_date: str = current_date.strftime("%Y-%m-%d %H:%M:%S")
+                prediction = self.predictions.to_json(orient='records',
+                                                      date_format='iso')
+                parametrs: List[Any] = [
+                    BEARING_LIST[self.bearing_type], report_date, prediction]
+                cursor.execute(query, parametrs)
+                connection.commit()
+            information_text: str = 'Прогнозы успешно загружены'
+            information_message = wx.MessageDialog(
+                None,
+                information_text,
+                ' ',
+                wx.OK | wx.ICON_INFORMATION)
+            information_message.ShowModal()
+            self.connection_pool.putconn(connection)
 
 
 class SelectDataWindow(wx.Dialog):
@@ -442,8 +473,8 @@ class SelectDataWindow(wx.Dialog):
         """
         if date_begin == date_end:
             error_text: str = 'Даты начала и конца прогноза не могут быть равными.\
-            \nЕсли хотите сделать прогноз на 24 часа укажите второй датой\
- следующий день.'
+            \nЕсли хотите сделать прогноз на 24 часа,\
+            \nто укажите второй датой следующий день.'
             error_message = wx.MessageDialog(None,
                                              error_text,
                                              ' ',
@@ -495,8 +526,8 @@ class CanvasPanel(wx.Panel):
         self.Fit()
 
     def get_outliers(self,
-                     predictions: pd.core.frame.DataFrame,
-                     bearing_type: int) -> pd.core.frame.DataFrame:
+                     predictions: Any,
+                     bearing_type: int) -> Any:
         """Get outliers DataFrame.
 
         Args:
@@ -514,7 +545,7 @@ class CanvasPanel(wx.Panel):
         return outliers
 
     def show_plot(self,
-                  predictions: pd.core.frame.DataFrame,
+                  predictions: Any,
                   bearing_type: int) -> None:
         """Show plot with predictions.
 
@@ -524,12 +555,13 @@ class CanvasPanel(wx.Panel):
             bearing_type (int): Need to determine the limit value of vibration.
         """
         bearing_name: str = BEARING_LIST[bearing_type]
-        self.axes.plot(predictions['date'], predictions['value'],
+
+        self.axes.plot(predictions['value'],
                        label='Прогнозные значения', color='blue')
-        self.axes.plot(predictions['date'], predictions['min_value'],
+        self.axes.plot(predictions['min_value'],
                        linestyle='--', color='cyan',
                        label='Минимальные прогнозные значения')
-        self.axes.plot(predictions['date'], predictions['max_value'],
+        self.axes.plot(predictions['max_value'],
                        linestyle='--', color='orange',
                        label='Максимальные прогнозные значения')
 
@@ -699,13 +731,13 @@ def internet_connection_fail() -> None:
 
 
 def check_internet_connection() -> bool:
-    """Try to ping www.google.com.
+    """Try to ping www.yandex.ru.
 
     Returns:
         bool: True if the attempt was successful.
     """
     try:
-        socket.create_connection(("www.google.com", 80))
+        socket.create_connection(("www.yandex.ru", 80))
     except OSError:
         internet_connection_fail()
     else:
