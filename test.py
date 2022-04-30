@@ -293,14 +293,7 @@ class MainWindow(wx.Frame):
         if check_internet_connection():
             connection = self.connection_pool.getconn()
             with connection.cursor() as cursor:
-                query: str = "WITH current_bearing AS\
-                        (SELECT bearing_id\
-                        FROM running_bearings\
-                        WHERE \"type\" = %s)\
-                        INSERT INTO report (date, bearing_id, prediction)\
-                        SELECT %s,\
-                        (SELECT * from current_bearing) AS bearing_id,\
-                        %s"
+                query: str = "CALL insert_predictions(%s, %s, %s);"
                 current_date = datetime.today()
                 report_date: str = current_date.strftime("%Y-%m-%d %H:%M:%S")
                 prediction = self.predictions.to_json(orient='records',
