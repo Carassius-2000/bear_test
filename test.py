@@ -52,6 +52,8 @@ class AuthorizationWindow(wx.Frame):
         panel = wx.Panel(self)
         panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
+        ico = wx.Icon('forecast.ico', wx.BITMAP_TYPE_ICO)
+        self.SetIcon(ico)
         # create FlexGridSizer that contains login and password edits
         # with their respective labels
         flex_grid_sizer = wx.FlexGridSizer(2, 2, 10, 10)
@@ -169,6 +171,8 @@ class MainWindow(wx.Frame):
         panel = wx.Panel(self)
         panel.SetFont(APP_FONT)
         panel.SetBackgroundColour(BACKGROUND_COLOR)
+        ico = wx.Icon('forecast.ico', wx.BITMAP_TYPE_ICO)
+        self.SetIcon(ico)
 
         box_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -662,7 +666,7 @@ class SendMessageWindow(wx.Dialog):
         """Send message and show message dialog."""
         bearing_type: str = BEARING_LIST[
             self.bearing_choice.GetCurrentSelection()]
-        date: str = str(self.date_edit.GetValue()).split()[0]
+        date: str = str(self.date_edit.GetValue()).split()[1]
         if check_internet_connection():
             self.send_mail(bearing_type, date)
             dialog_text: str = 'Сообщение успешно отправлено'
@@ -688,7 +692,7 @@ class SendMessageWindow(wx.Dialog):
 
             message = self.create_mail(bearing, date)
             SENDER_MAIL: str = message['From']
-            with open('modules/pass.txt', 'r') as password_file:
+            with open('pass.txt', 'r') as password_file:
                 PASSWORD: str = password_file.readline()
             server.login(SENDER_MAIL, PASSWORD)
 
